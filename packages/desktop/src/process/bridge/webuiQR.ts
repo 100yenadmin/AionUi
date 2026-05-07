@@ -8,8 +8,9 @@
  */
 
 import crypto from 'crypto';
-import { AuthService } from '@process/webserver/auth/service/AuthService';
-import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
+// TODO M6-cleanup: Migrate to @aionui/web-host
+// import { AuthService } from '@process/webserver/auth/service/AuthService';
+// import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
 import { WebuiService } from './services/WebuiService';
 
 // QR Token 存储 (内存中，有效期短) / QR Token store (in-memory, short-lived)
@@ -139,36 +140,34 @@ export async function verifyQRTokenDirect(
     // 标记为已使用 / Mark as used
     tokenData.used = true;
 
-    // 获取管理员用户 / Get admin user
-    const adminUser = await UserRepository.getPrimaryWebUIUser();
-    if (!adminUser) {
-      return {
-        success: false,
-        msg: 'WebUI user not found',
-      };
-    }
+    // TODO M6-cleanup: Migrate to @aionui/web-host
+    // const adminUser = await UserRepository.getPrimaryWebUIUser();
+    // if (!adminUser) {
+    //   return {
+    //     success: false,
+    //     msg: 'WebUI user not found',
+    //   };
+    // }
+    // const session_token = await AuthService.generateToken(adminUser);
+    // await UserRepository.updateLastLogin(adminUser.id);
+    // qrTokenStore.delete(qrToken);
+    // return {
+    //   success: true,
+    //   data: {
+    //     session_token,
+    //   },
+    // };
 
-    // 生成会话 token / Generate session token
-    const session_token = await AuthService.generateToken(adminUser);
-
-    // 更新最后登录时间 / Update last login time
-    await UserRepository.updateLastLogin(adminUser.id);
-
-    // 删除已使用的 QR token / Delete used QR token
     qrTokenStore.delete(qrToken);
-
-    return {
-      success: true,
-      data: {
-        session_token,
-        username: adminUser.username,
-      },
-    };
-  } catch (error) {
-    console.error('[WebUI QR] Verify QR token error:', error);
     return {
       success: false,
-      msg: error instanceof Error ? error.message : 'Failed to verify QR token',
+      msg: 'QR login not implemented - TODO M6-cleanup',
+    };
+  } catch (error) {
+    console.error('[webuiQR] verifyQRToken error:', error);
+    return {
+      success: false,
+      msg: error instanceof Error ? error.message : 'QR login failed',
     };
   }
 }

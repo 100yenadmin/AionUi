@@ -6,9 +6,14 @@
 
 import { networkInterfaces } from 'os';
 import type { IWebUIStatus } from '@/common/adapter/ipcBridge';
-import { AuthService } from '@process/webserver/auth/service/AuthService';
-import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
-import { AUTH_CONFIG, SERVER_CONFIG } from '@process/webserver/config/constants';
+// TODO M6-cleanup: These files should be migrated to @aionui/web-host or removed
+// import { AuthService } from '@process/webserver/auth/service/AuthService';
+// import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
+// import { AUTH_CONFIG, SERVER_CONFIG } from '@process/webserver/config/constants';
+
+// Stub constants (M6 cleanup pending)
+const AUTH_CONFIG = { DEFAULT_USER: { USERNAME: 'admin' } };
+const SERVER_CONFIG = { DEFAULT_PORT: 8080 };
 
 /**
  * WebUI 服务层 - 封装所有 WebUI 相关的业务逻辑
@@ -22,13 +27,14 @@ export class WebuiService {
   /**
    * 加载 webserver 函数（避免循环依赖）
    * Load webserver functions (avoid circular dependency)
+   * TODO M6-cleanup: Migrate to @aionui/web-host
    */
   private static async loadWebServerFunctions(): Promise<void> {
     if (this.webServerFunctionsLoaded) return;
 
-    const webServer = await import('@process/webserver/index');
-    this._getInitialAdminPassword = webServer.getInitialAdminPassword;
-    this._clearInitialAdminPassword = webServer.clearInitialAdminPassword;
+    // const webServer = await import('@process/webserver/index');
+    // this._getInitialAdminPassword = webServer.getInitialAdminPassword;
+    // this._clearInitialAdminPassword = webServer.clearInitialAdminPassword;
     this.webServerFunctionsLoaded = true;
   }
 
@@ -92,19 +98,22 @@ export class WebuiService {
   /**
    * 获取管理员用户（带自动加载）
    * Get admin user (with auto-loading)
+   * TODO M6-cleanup: Migrate to @aionui/web-host
    */
   static async getAdminUser() {
     await this.loadWebServerFunctions();
-    const adminUser = await UserRepository.getPrimaryWebUIUser();
-    if (!adminUser) {
-      throw new Error('WebUI user not found');
-    }
-    return adminUser;
+    // const adminUser = await UserRepository.getPrimaryWebUIUser();
+    // if (!adminUser) {
+    //   throw new Error('WebUI user not found');
+    // }
+    // return adminUser;
+    throw new Error('WebuiService.getAdminUser not implemented - TODO M6-cleanup');
   }
 
   /**
    * 获取 WebUI 状态
    * Get WebUI status
+   * TODO M6-cleanup: Migrate to @aionui/web-host
    */
   static async getStatus(
     webServerInstance: {
@@ -116,7 +125,7 @@ export class WebuiService {
   ): Promise<IWebUIStatus> {
     await this.loadWebServerFunctions();
 
-    const adminUser = await UserRepository.getPrimaryWebUIUser();
+    // const adminUser = await UserRepository.getPrimaryWebUIUser();
     const running = webServerInstance !== null;
     const port = webServerInstance?.port ?? SERVER_CONFIG.DEFAULT_PORT;
     const allowRemote = webServerInstance?.allowRemote ?? false;
@@ -132,7 +141,7 @@ export class WebuiService {
       localUrl,
       networkUrl,
       lanIP: lanIP ?? undefined,
-      adminUsername: adminUser?.username ?? AUTH_CONFIG.DEFAULT_USER.USERNAME,
+      adminUsername: AUTH_CONFIG.DEFAULT_USER.USERNAME,
       initialPassword: this.getInitialAdminPassword() ?? undefined,
     };
   }
@@ -140,71 +149,57 @@ export class WebuiService {
   /**
    * 修改密码（不需要当前密码验证）
    * Change password (no current password verification required)
+   * TODO M6-cleanup: Migrate to @aionui/web-host
    */
-  static async changePassword(newPassword: string): Promise<void> {
-    const adminUser = await this.getAdminUser();
-
-    // 验证新密码强度 / Validate new password strength
-    const passwordValidation = AuthService.validatePasswordStrength(newPassword);
-    if (!passwordValidation.isValid) {
-      throw new Error(passwordValidation.errors.join('; '));
-    }
-
-    // 更新密码（密文存储）/ Update password (encrypted storage)
-    const newPasswordHash = await AuthService.hashPassword(newPassword);
-    await UserRepository.updatePassword(adminUser.id, newPasswordHash);
-
-    // 使所有现有 token 失效 / Invalidate all existing tokens
-    await AuthService.invalidateAllTokens();
-
-    // 清除初始密码（用户已修改密码）/ Clear initial password (user has changed password)
-    this.clearInitialAdminPassword();
+  static async changePassword(_newPassword: string): Promise<void> {
+    // const adminUser = await this.getAdminUser();
+    // const passwordValidation = AuthService.validatePasswordStrength(newPassword);
+    // if (!passwordValidation.isValid) {
+    //   throw new Error(passwordValidation.errors.join('; '));
+    // }
+    // const newPasswordHash = await AuthService.hashPassword(newPassword);
+    // await UserRepository.updatePassword(adminUser.id, newPasswordHash);
+    // await AuthService.invalidateAllTokens();
+    // this.clearInitialAdminPassword();
+    throw new Error('WebuiService.changePassword not implemented - TODO M6-cleanup');
   }
 
-  static async changeUsername(newUsername: string): Promise<string> {
-    const adminUser = await this.getAdminUser();
-    const normalizedUsername = newUsername.trim();
-
-    const usernameValidation = AuthService.validateUsername(normalizedUsername);
-    if (!usernameValidation.isValid) {
-      throw new Error(usernameValidation.errors.join('; '));
-    }
-
-    const existingUser = await UserRepository.findByUsername(normalizedUsername);
-    if (existingUser && existingUser.id !== adminUser.id) {
-      throw new Error('Username already exists');
-    }
-
-    if (normalizedUsername === adminUser.username) {
-      return adminUser.username;
-    }
-
-    await UserRepository.updateUsername(adminUser.id, normalizedUsername);
-    await AuthService.invalidateAllTokens();
-
-    return normalizedUsername;
+  /**
+   * TODO M6-cleanup: Migrate to @aionui/web-host
+   */
+  static async changeUsername(_newUsername: string): Promise<string> {
+    // const adminUser = await this.getAdminUser();
+    // const normalizedUsername = newUsername.trim();
+    // const usernameValidation = AuthService.validateUsername(normalizedUsername);
+    // if (!usernameValidation.isValid) {
+    //   throw new Error(usernameValidation.errors.join('; '));
+    // }
+    // const existingUser = await UserRepository.findByUsername(normalizedUsername);
+    // if (existingUser && existingUser.id !== adminUser.id) {
+    //   throw new Error('Username already exists');
+    // }
+    // if (normalizedUsername === adminUser.username) {
+    //   return adminUser.username;
+    // }
+    // await UserRepository.updateUsername(adminUser.id, normalizedUsername);
+    // await AuthService.invalidateAllTokens();
+    // return normalizedUsername;
+    throw new Error('WebuiService.changeUsername not implemented - TODO M6-cleanup');
   }
 
   /**
    * 重置密码（生成新的随机密码）
    * Reset password (generate new random password)
+   * TODO M6-cleanup: Migrate to @aionui/web-host
    */
   static async resetPassword(): Promise<string> {
-    const adminUser = await this.getAdminUser();
-
-    // 生成新的随机密码 / Generate new random password
-    const newPassword = AuthService.generateRandomPassword();
-    const newPasswordHash = await AuthService.hashPassword(newPassword);
-
-    // 更新密码 / Update password
-    await UserRepository.updatePassword(adminUser.id, newPasswordHash);
-
-    // 使所有现有 token 失效 / Invalidate all existing tokens
-    await AuthService.invalidateAllTokens();
-
-    // 清除旧的初始密码 / Clear old initial password
-    this.clearInitialAdminPassword();
-
-    return newPassword;
+    // const adminUser = await this.getAdminUser();
+    // const newPassword = AuthService.generateRandomPassword();
+    // const newPasswordHash = await AuthService.hashPassword(newPassword);
+    // await UserRepository.updatePassword(adminUser.id, newPasswordHash);
+    // await AuthService.invalidateAllTokens();
+    // this.clearInitialAdminPassword();
+    // return newPassword;
+    throw new Error('WebuiService.resetPassword not implemented - TODO M6-cleanup');
   }
 }

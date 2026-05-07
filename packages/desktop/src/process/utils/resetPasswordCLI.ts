@@ -10,7 +10,8 @@
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
 import { getDataPath } from '@process/utils';
-import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
+// TODO M6-cleanup: Migrate to @aionui/web-host
+// import { UserRepository } from '@process/webserver/auth/repository/UserRepository';
 import path from 'path';
 
 // 颜色输出 / Color output
@@ -76,73 +77,11 @@ export function resolveResetPasswordUsername(argv: string[]): string {
  * @param username - Username to reset password for
  */
 export async function resetPasswordCLI(username: string): Promise<void> {
-  try {
-    log.info('Starting password reset...');
-    log.info(`Target user: ${username}`);
-
-    // Get database path using the same logic as the main app
-    const dbPath = path.join(getDataPath(), 'aionui.db');
-    log.info(`Database path: ${dbPath}`);
-
-    const hasUsers = await UserRepository.hasUsers();
-    if (!hasUsers) {
-      log.error('Database is not initialized yet');
-      log.info('');
-      log.info('Please run AionUi at least once to initialize the database:');
-      log.info('  aionui --webui');
-      log.info('');
-      log.info('Then you can reset the password using:');
-      log.info('  aionui --resetpass <username>');
-      process.exit(1);
-    }
-
-    const user = await UserRepository.findByUsername(username);
-    if (!user) {
-      log.error(`User '${username}' not found in database`);
-      log.info('');
-      log.info('Available users:');
-
-      const allUsers = await UserRepository.listUsers();
-      if (allUsers.length === 0) {
-        log.info('  (no users found)');
-      } else {
-        allUsers.forEach((entry: { username: string }) => log.info(`  - ${entry.username}`));
-      }
-      process.exit(1);
-    }
-
-    log.info(`Found user: ${user.username} (ID: ${user.id})`);
-
-    // Generate new password
-    const newPassword = generatePassword();
-    const hashedPassword = await hashPassword(newPassword);
-
-    await UserRepository.updatePassword(user.id, hashedPassword);
-
-    const newJwtSecret = crypto.randomBytes(64).toString('hex');
-    await UserRepository.updateJwtSecret(user.id, newJwtSecret);
-
-    // Display result
-    console.log('');
-    log.success('Password reset successfully!');
-    console.log('');
-    log.highlight('========================================');
-    log.highlight(`  Username: ${user.username}`);
-    log.highlight(`  New Password: ${newPassword}`);
-    log.highlight('========================================');
-    console.log('');
-    log.warning('JWT secret has been rotated');
-    log.warning('All previous tokens are now invalid');
-    console.log('');
-    log.info('Next steps:');
-    log.info('   1. Refresh your browser (Cmd+R or Ctrl+R)');
-    log.info('   2. You will be redirected to login page');
-    log.info('   3. Login with the new password above');
-    console.log('');
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    log.error(`Error: ${errorMessage}`);
-    console.error(error);
-    process.exit(1);
-  }
+  // TODO M6-cleanup: Migrate to @aionui/web-host
+  log.error('resetPasswordCLI not implemented - TODO M6-cleanup');
+  log.info(`Target user: ${username} (feature disabled)`);
+  log.info('');
+  log.info('This feature depends on legacy webserver components that were removed in M6.');
+  log.info('It will be re-implemented with @aionui/web-host in a future milestone.');
+  process.exit(1);
 }
