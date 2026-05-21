@@ -313,6 +313,7 @@ export const useAcpMessage = (conversation_id: string): UseAcpMessageReturn => {
   // Reset state when conversation changes and restore actual running status
   useEffect(() => {
     let cancelled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
 
     setThought({ subject: '', description: '' });
     setAcpStatus(null);
@@ -352,6 +353,14 @@ export const useAcpMessage = (conversation_id: string): UseAcpMessageReturn => {
       if (isRunning) {
         setAiProcessing(true);
         aiProcessingRef.current = true;
+
+        // Watchdog: if no stream content arrives within 10s, the backend is
+        // likely stuck (e.g. after a crash/restart). Force-cancel to recover.
+        watchdog = setTimeout(() => {
+          if (runningRef.current && !hasContentInTurnRef.current) {
+            void ipcBridge.conversation.stop.invoke({ conversation_id }).catch(() => {});
+          }
+        }, 10_000);
       }
       setHasHydratedRunningState(true);
 
@@ -369,6 +378,7 @@ export const useAcpMessage = (conversation_id: string): UseAcpMessageReturn => {
 
     return () => {
       cancelled = true;
+      if (watchdog) clearTimeout(watchdog);
     };
   }, [conversation_id]);
 
