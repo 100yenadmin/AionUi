@@ -365,6 +365,67 @@ export interface IRendererLogEntry {
   data?: unknown;
 }
 
+export type IEvaosRuntimeKey =
+  | 'openclaw'
+  | 'hermes'
+  | 'paperclip'
+  | 'browser'
+  | 'terminal'
+  | 'opendesign'
+  | 'creative_studio';
+
+export type IEvaosBrokerSessionState = 'missing' | 'authenticated' | 'expired';
+
+export interface IEvaosBrokerSessionStatus {
+  state: IEvaosBrokerSessionState;
+  authenticated: boolean;
+  expired: boolean;
+  userEmail?: string;
+  expiresAt?: string;
+  source: 'none' | 'environment' | 'memory';
+  message: string;
+}
+
+export interface IEvaosBrokerClaimDeviceCodeRequest {
+  deviceCode: string;
+}
+
+export interface IEvaosRuntimeStatusRequest {
+  customerId: string;
+  runtime: IEvaosRuntimeKey;
+}
+
+export interface IEvaosSafeUrlSummary {
+  scheme?: string;
+  host?: string;
+  path?: string;
+  displayText: string;
+  redacted: boolean;
+}
+
+export interface IEvaosRuntimeStatusView {
+  schemaVersion?: string;
+  customerAccountId?: string;
+  customerId: string;
+  runtimeKey: IEvaosRuntimeKey;
+  displayLabel: string;
+  status: string;
+  healthSummary?: string;
+  lastCheckedAt?: string;
+  roomId?: string;
+  currentUrlSummary?: IEvaosSafeUrlSummary;
+  owner?: string;
+  authNeeded?: boolean;
+  captchaNeeded?: boolean;
+  waitingOnUser?: boolean;
+  controlSessionActive?: boolean;
+  updateAvailable?: boolean;
+  lastActivityAt?: string;
+  actions?: string[];
+  sourcePointer?: string;
+  auditId?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Application — stays IPC (Electron-native)
 // ---------------------------------------------------------------------------
@@ -1102,6 +1163,23 @@ export type INotificationOptions = {
 export const notification = {
   show: bridge.buildProvider<void, INotificationOptions>('notification.show'),
   clicked: bridge.buildEmitter<{ conversation_id?: string }>('notification.clicked'),
+};
+
+// ---------------------------------------------------------------------------
+// evaOS Broker — stays IPC so desktop-session secrets never enter renderer state.
+// ---------------------------------------------------------------------------
+
+export const evaosBroker = {
+  claimDeviceCode: bridge.buildProvider<IBridgeResponse<IEvaosBrokerSessionStatus>, IEvaosBrokerClaimDeviceCodeRequest>(
+    'evaos.broker.claim-device-code'
+  ),
+  getSessionStatus: bridge.buildProvider<IBridgeResponse<IEvaosBrokerSessionStatus>, void>(
+    'evaos.broker.session-status'
+  ),
+  runtimeStatus: bridge.buildProvider<IBridgeResponse<IEvaosRuntimeStatusView>, IEvaosRuntimeStatusRequest>(
+    'evaos.broker.runtime-status'
+  ),
+  revokeSession: bridge.buildProvider<IBridgeResponse<IEvaosBrokerSessionStatus>, void>('evaos.broker.revoke-session'),
 };
 
 // ---------------------------------------------------------------------------
