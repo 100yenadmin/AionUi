@@ -283,6 +283,28 @@ describe('EvaosBrokerSessionClient provider hub', () => {
     });
   });
 
+  it('fails closed when provider profile row belongs to a different customer account', async () => {
+    const fetchImpl = fetchMock();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          providerProfilesResponse([
+            {
+              ...connectedGoogleProfile,
+              customer_account_id: 'acct_other',
+            },
+          ])
+        )
+      );
+    const client = authenticatedClient(fetchImpl);
+
+    await expect(client.providerHub({ customerId: 'david-poku' })).rejects.toMatchObject({
+      code: 'broker_invalid_response',
+    });
+  });
+
   it('fails closed instead of rendering empty state when provider list schema is malformed', async () => {
     const fetchImpl = fetchMock();
     fetchImpl
@@ -373,6 +395,30 @@ describe('EvaosBrokerSessionClient provider hub', () => {
           provider_key: 'google_workspace',
           status: 'pending',
           source_pointer: 'broker:provider_auth_start:google_workspace',
+          backend_enforced: true,
+        })
+      );
+    const client = authenticatedClient(fetchImpl);
+
+    await expect(
+      client.startProviderAuth({ customerId: 'david-poku', providerKey: 'google_workspace' })
+    ).rejects.toMatchObject({
+      code: 'broker_invalid_response',
+      message: 'The evaOS broker did not return provider action enforcement proof.',
+    });
+  });
+
+  it('fails closed when provider action proof uses provider-list source pointer', async () => {
+    const fetchImpl = fetchMock();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          provider_key: 'google_workspace',
+          status: 'pending',
+          source_pointer: 'broker:provider_profiles:david-poku',
+          audit_id: 'audit_auth_123',
           backend_enforced: true,
         })
       );

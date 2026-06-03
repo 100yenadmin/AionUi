@@ -942,7 +942,7 @@ function sanitizeProviderHub(
   const responseCustomerId = safeText(record?.customer_id);
   assertCustomerScopeMatches(responseCustomerId, policy, fallbackCustomerId, 'provider profile');
 
-  const profiles = safeProviderProfiles(source);
+  const profiles = safeProviderProfiles(source, policy.customerAccountId);
   const backendEnforced = safeBoolean(record?.backend_enforced);
   const sourcePointer = safeText(record?.source_pointer);
   const auditId = safeText(record?.audit_id);
@@ -1005,7 +1005,7 @@ function sanitizeProviderActionResult(
   const backendEnforced = safeBoolean(record.backend_enforced);
   const hasProfiles = Array.isArray(record.provider_profiles ?? record.profiles ?? record.providers);
   const providerHub = hasProfiles ? sanitizeProviderHub(record, fallback.policy, fallback.customerId) : undefined;
-  const sourcePointer = safeText(record.source_pointer);
+  const sourcePointer = safeProviderActionSourcePointer(record.source_pointer, fallback.action, providerKey);
   const auditId = safeText(record.audit_id);
 
   if (!status || backendEnforced !== true || !sourcePointer || !auditId) {
@@ -1028,13 +1028,13 @@ function sanitizeProviderActionResult(
   });
 }
 
-function safeProviderProfiles(value: unknown): IEvaosProviderProfileView[] {
+function safeProviderProfiles(value: unknown, expectedCustomerAccountId?: string): IEvaosProviderProfileView[] {
   if (!Array.isArray(value)) {
     return [];
   }
 
   return value.map((item): IEvaosProviderProfileView => {
-    const profile = sanitizeSingleProviderProfile(item);
+    const profile = sanitizeSingleProviderProfile(item, expectedCustomerAccountId);
     if (!profile) {
       throw new EvaosBrokerSessionError('broker_invalid_response', 'The evaOS broker returned an invalid response.');
     }
@@ -1042,19 +1042,27 @@ function safeProviderProfiles(value: unknown): IEvaosProviderProfileView[] {
   });
 }
 
-function sanitizeSingleProviderProfile(raw: unknown): IEvaosProviderProfileView | undefined {
+function sanitizeSingleProviderProfile(
+  raw: unknown,
+  expectedCustomerAccountId?: string
+): IEvaosProviderProfileView | undefined {
   const record = asRecord(raw);
   if (!record) return undefined;
 
   const nested = asRecord(record.provider_profile) ?? asRecord(record.profile);
   if (nested) {
-    return sanitizeSingleProviderProfile(nested);
+    return sanitizeSingleProviderProfile(nested, expectedCustomerAccountId);
   }
 
   const providerKey = normalizeProviderKeyValue(record.provider_key ?? record.provider ?? record.key);
   const rawStatus = safeText(record.status, 80);
   const status = normalizeProviderStatusValue(rawStatus);
   if (!providerKey || !status) {
+    return undefined;
+  }
+
+  const customerAccountId = safeText(record.customer_account_id);
+  if (customerAccountId && expectedCustomerAccountId && customerAccountId !== expectedCustomerAccountId) {
     return undefined;
   }
 
@@ -1079,7 +1087,7 @@ function sanitizeSingleProviderProfile(raw: unknown): IEvaosProviderProfileView 
     approvalRequired,
     capabilities: safeStringList(record.capabilities, 120),
     usageSummary: safeText(record.usage_summary, 220),
-    customerAccountId: safeText(record.customer_account_id),
+    customerAccountId,
     ownerKind: safeText(record.owner_kind, 80),
     ownerUserId: safeText(record.owner_user_id, 120),
     grantedScopes: safeStringList(record.granted_scopes ?? record.scopes, 120),
@@ -1845,6 +1853,20 @@ function safeProviderProfileSourcePointer(value: unknown, providerKey: IEvaosPro
   }
 
   return undefined;
+}
+
+function safeProviderActionSourcePointer(
+  value: unknown,
+  action: 'provider_auth_start' | 'provider_switch' | 'provider_revoke' | 'provider_mint_grant',
+  providerKey: IEvaosProviderKey
+): string | undefined {
+  const text = safeText(value, 180);
+  if (!text) {
+    return undefined;
+  }
+
+  const expectedActionPointer = `broker:${action}:${providerKey}`;
+  return text === expectedActionPointer ? text : undefined;
 }
 
 function hasOpaqueProviderHandle(value: unknown): boolean {
