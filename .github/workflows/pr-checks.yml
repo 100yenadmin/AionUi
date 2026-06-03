@@ -600,6 +600,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Audit evaOS beta release config
+        run: node scripts/evaosBetaReleaseGate.js audit-config
+
       - name: Create mock build artifacts
         shell: bash
         run: bash scripts/create-mock-release-artifacts.sh build-artifacts
@@ -610,6 +613,22 @@ jobs:
           MOCK_VERSION: '1.0.0'
           INCLUDE_WEB_CLI_ASSETS: '0'
         run: bash scripts/prepare-release-assets.sh build-artifacts release-assets
+
+      - name: Write and verify evaOS beta release manifest
+        shell: bash
+        env:
+          GITHUB_REPOSITORY: 100yenadmin/AionUi
+          GITHUB_WORKFLOW: Build and Release
+          GITHUB_RUN_ID: '12345'
+          GITHUB_RUN_ATTEMPT: '1'
+          EVAOS_BETA_RELEASE_COMMIT: mock-sha
+          EVAOS_BETA_RELEASE_BRANCH: evaos/release-public-beta
+          EVAOS_BETA_RELEASE_PUBLISH_ENABLED: 'true'
+          EXPECTED_RELEASE_COMMIT: mock-sha
+          EVAOS_BETA_SKIP_GITHUB_RUN_VERIFY: '1'
+        run: |
+          node scripts/evaosBetaReleaseGate.js write-manifest release-assets evaos-beta-v1.0.0-evaos-beta.0
+          node scripts/evaosBetaReleaseGate.js verify-manifest release-assets evaos-beta-v1.0.0-evaos-beta.0
 
       - name: Validate script output
         shell: bash
