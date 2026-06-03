@@ -22,6 +22,7 @@ import { autoUpdaterService } from '../services/autoUpdaterService';
 import {
   EVAOS_BETA_UPDATE_DISABLED_MESSAGE,
   getEvaosBetaUpdateRepo,
+  isAllowedEvaosBetaUpdateRepo,
   isEvaosBetaBuild,
   shouldDisableAutoUpdate,
 } from '../evaosBetaSafety';
@@ -221,6 +222,32 @@ const assertAllowedUrl = async (rawUrl: string) => {
   }
   if (!ALLOWED_DOWNLOAD_HOSTS.has(parsed.hostname)) {
     throw new Error((await getI18n()).t('update.errors.hostNotAllowed', { host: parsed.hostname }));
+  }
+};
+
+const extractGitHubReleaseRepo = (rawUrl: string): string | undefined => {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return undefined;
+  }
+
+  if (parsed.hostname !== 'github.com') return undefined;
+  const [owner, repo, releases, download] = parsed.pathname.split('/').filter(Boolean);
+  if (!owner || !repo || releases !== 'releases' || download !== 'download') return undefined;
+  return `${owner}/${repo}`;
+};
+
+const assertAllowedDownloadRequestUrl = async (rawUrl: string) => {
+  await assertAllowedUrl(rawUrl);
+
+  if (!isEvaosBetaBuild()) return;
+
+  const betaRepo = getEvaosBetaUpdateRepo();
+  const requestRepo = extractGitHubReleaseRepo(rawUrl);
+  if (!isAllowedEvaosBetaUpdateRepo(betaRepo) || requestRepo !== betaRepo) {
+    throw new Error('Update download URL is not from the configured evaOS beta update feed.');
   }
 };
 
@@ -602,12 +629,11 @@ export function initUpdateBridge(): void {
         }
 
         // Defense-in-depth: do not allow arbitrary downloads from renderer.
-        // EN: Only allowlisted hosts (CDN + GitHub release hosts) are permitted;
-        // each redirect hop is re-validated against the allowlist.
-        // 中文：仅允许白名单内的域名（CDN + GitHub release 相关），并手动处理重定向，每一跳都校验白名单。
-        await assertAllowedUrl(params.url);
+        // Non-beta allows known CDN/GitHub release hosts. Beta additionally
+        // binds renderer-provided URLs to the configured evaOS-owned feed.
+        await assertAllowedDownloadRequestUrl(params.url);
         if (params.fallbackUrl) {
-          await assertAllowedUrl(params.fallbackUrl);
+          await assertAllowedDownloadRequestUrl(params.fallbackUrl);
         }
 
         const downloadId = uuid();

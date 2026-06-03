@@ -314,6 +314,8 @@ jobs:
 
       - name: Prepare release assets (normalize updater metadata)
         shell: bash
+        env:
+          INCLUDE_WEB_CLI_ASSETS: '0'
         run: bash scripts/prepare-release-assets.sh build-artifacts release-assets
 
       - name: Create Release
@@ -328,9 +330,6 @@ jobs:
             release-assets/**/*.deb
             release-assets/**/*.zip
             release-assets/**/*.yml
-            release-assets/**/*.tar.gz
-            release-assets/**/*.sha256
-            release-assets/install-web.sh
           generate_release_notes: true
           draft: true
           prerelease: ${{ steps.version.outputs.is_dev == 'true' || contains(steps.version.outputs.tag_name, 'beta') || contains(steps.version.outputs.tag_name, 'alpha') || contains(steps.version.outputs.tag_name, 'rc') }}

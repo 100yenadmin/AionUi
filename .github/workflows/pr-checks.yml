@@ -599,8 +599,11 @@ jobs:
         shell: bash
         env:
           MOCK_VERSION: '1.0.0'
+          INCLUDE_WEB_CLI_ASSETS: '0'
         run: bash scripts/prepare-release-assets.sh build-artifacts release-assets
 
       - name: Validate script output
         shell: bash
+        env:
+          INCLUDE_WEB_CLI_ASSETS: '0'
         run: bash scripts/verify-release-assets.sh release-assets
