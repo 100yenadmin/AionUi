@@ -19,6 +19,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import semver from 'semver';
 import { autoUpdaterService } from '../services/autoUpdaterService';
+import {
+  EVAOS_BETA_UPDATE_DISABLED_MESSAGE,
+  getEvaosBetaUpdateRepo,
+  isEvaosBetaBuild,
+  shouldDisableAutoUpdate,
+} from '../evaosBetaSafety';
 
 /** Lazily loads i18n to avoid pulling in initStorage chain at module load time */
 let _i18nCache: Promise<typeof import('../services/i18n')> | null = null;
@@ -193,6 +199,10 @@ export const pickRecommendedAsset = (
 };
 
 const resolveRepo = (requestRepo?: string): string => {
+  if (isEvaosBetaBuild()) {
+    return getEvaosBetaUpdateRepo() ?? '';
+  }
+
   const envRepo = process.env.AIONUI_GITHUB_REPO?.trim();
   const repo = (requestRepo || envRepo || DEFAULT_REPO).trim();
   return repo || DEFAULT_REPO;
@@ -522,7 +532,14 @@ export function initUpdateBridge(): void {
   ipcBridge.update.check.provider(
     async (params): Promise<{ success: boolean; data?: UpdateCheckResult; msg?: string }> => {
       try {
+        if (shouldDisableAutoUpdate()) {
+          return { success: false, msg: EVAOS_BETA_UPDATE_DISABLED_MESSAGE };
+        }
+
         const repo = resolveRepo(params?.repo);
+        if (!repo) {
+          return { success: false, msg: EVAOS_BETA_UPDATE_DISABLED_MESSAGE };
+        }
         const includePrerelease = Boolean(params?.includePrerelease);
         const currentVersion = app.getVersion();
 
@@ -576,6 +593,10 @@ export function initUpdateBridge(): void {
   ipcBridge.update.download.provider(
     async (params: UpdateDownloadRequest): Promise<{ success: boolean; data?: UpdateDownloadResult; msg?: string }> => {
       try {
+        if (shouldDisableAutoUpdate()) {
+          return { success: false, msg: EVAOS_BETA_UPDATE_DISABLED_MESSAGE };
+        }
+
         if (!params?.url) {
           return { success: false, msg: (await getI18n()).t('update.errors.missingUrl') };
         }
@@ -620,6 +641,10 @@ export function initUpdateBridge(): void {
       msg?: string;
     }> => {
       try {
+        if (shouldDisableAutoUpdate()) {
+          return { success: false, msg: EVAOS_BETA_UPDATE_DISABLED_MESSAGE };
+        }
+
         // Set prerelease preference before checking
         const includePrerelease = Boolean(params?.includePrerelease);
         autoUpdaterService.setAllowPrerelease(includePrerelease);
@@ -649,6 +674,10 @@ export function initUpdateBridge(): void {
 
   ipcBridge.autoUpdate.download.provider(async (): Promise<{ success: boolean; msg?: string }> => {
     try {
+      if (shouldDisableAutoUpdate()) {
+        return { success: false, msg: EVAOS_BETA_UPDATE_DISABLED_MESSAGE };
+      }
+
       const result = await autoUpdaterService.downloadUpdate();
       return { success: result.success, msg: result.error };
     } catch (err: unknown) {
@@ -658,6 +687,11 @@ export function initUpdateBridge(): void {
 
   ipcBridge.autoUpdate.quitAndInstall.provider(async (): Promise<void> => {
     try {
+      if (shouldDisableAutoUpdate()) {
+        console.warn(`[updateBridge] ${EVAOS_BETA_UPDATE_DISABLED_MESSAGE}`);
+        return;
+      }
+
       autoUpdaterService.quitAndInstall();
     } catch (err: unknown) {
       console.error('quitAndInstall failed:', err);
