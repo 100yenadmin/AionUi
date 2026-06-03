@@ -97,6 +97,7 @@ const VALID_PROVIDER_STATUSES: ReadonlySet<IEvaosProviderStatus> = new Set([
 ]);
 
 const VALID_PROVIDER_AGENT_RUNTIMES: ReadonlySet<IEvaosProviderAgentRuntime> = new Set(['openclaw', 'hermes']);
+const PROVIDER_CONNECTION_PROOF_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 
 const SECRET_FIELD_PATTERN =
   /(authorization|bearer|token|secret|password|credential|desktop[_-]?session|access[_-]?token|refresh[_-]?token|api[_-]?key|service[_-]?role|provider[_-]?grant|grant[_-]?handle)/i;
@@ -516,7 +517,8 @@ export class EvaosBrokerSessionClient {
         !profile ||
         profile.status !== 'connected' ||
         profile.rawSecretsStoredInWorkbench ||
-        !profile.hasConnectionProof
+        !profile.hasConnectionProof ||
+        !hasFreshProviderConnectionProof(profile, this.now())
       ) {
         throw new EvaosBrokerSessionError(
           'action_denied',
@@ -937,6 +939,9 @@ function sanitizeProviderHub(
     throw new EvaosBrokerSessionError('broker_invalid_response', 'The evaOS broker returned an invalid response.');
   }
 
+  const responseCustomerId = safeText(record?.customer_id);
+  assertCustomerScopeMatches(responseCustomerId, policy, fallbackCustomerId, 'provider profile');
+
   const profiles = safeProviderProfiles(source);
   const backendEnforced = safeBoolean(record?.backend_enforced);
   const sourcePointer = safeText(record?.source_pointer);
@@ -962,7 +967,7 @@ function sanitizeProviderHub(
 
   return stripUndefined({
     schemaVersion: 'evaos.provider_hub.v1' as const,
-    customerId: safeText(record?.customer_id) ?? fallbackCustomerId,
+    customerId: responseCustomerId ?? policy.selectedCustomerId ?? fallbackCustomerId,
     customerAccountId: policy.customerAccountId,
     membershipId: policy.membershipId,
     membershipRole: policy.membershipRole,
@@ -1000,10 +1005,10 @@ function sanitizeProviderActionResult(
   const backendEnforced = safeBoolean(record.backend_enforced);
   const hasProfiles = Array.isArray(record.provider_profiles ?? record.profiles ?? record.providers);
   const providerHub = hasProfiles ? sanitizeProviderHub(record, fallback.policy, fallback.customerId) : undefined;
-  const sourcePointer = safeText(record.source_pointer) ?? providerHub?.sourcePointer;
-  const auditId = safeText(record.audit_id) ?? providerHub?.auditId;
+  const sourcePointer = safeText(record.source_pointer);
+  const auditId = safeText(record.audit_id);
 
-  if (!status || backendEnforced !== true || (!sourcePointer && !auditId)) {
+  if (!status || backendEnforced !== true || !sourcePointer || !auditId) {
     throw new EvaosBrokerSessionError(
       'broker_invalid_response',
       'The evaOS broker did not return provider action enforcement proof.'
@@ -1490,6 +1495,44 @@ function assertProviderPolicyProof(policy: IEvaosPeopleAccessPolicyView): void {
       'Connected app actions require backend-enforced account policy proof.'
     );
   }
+}
+
+function assertCustomerScopeMatches(
+  responseCustomerId: string | undefined,
+  policy: IEvaosPeopleAccessPolicyView,
+  fallbackCustomerId: string,
+  context: string
+): void {
+  if (!responseCustomerId) {
+    return;
+  }
+
+  const allowedCustomerIds = new Set([fallbackCustomerId, policy.selectedCustomerId].filter(Boolean));
+  if (!allowedCustomerIds.has(responseCustomerId)) {
+    throw new EvaosBrokerSessionError(
+      'broker_invalid_response',
+      `The evaOS broker returned ${context} evidence for a different customer.`
+    );
+  }
+}
+
+function hasFreshProviderConnectionProof(profile: IEvaosProviderProfileView, now: Date): boolean {
+  if (profile.status !== 'connected' || profile.rawSecretsStoredInWorkbench || !profile.hasConnectionProof) {
+    return false;
+  }
+
+  const validatedAt = profile.lastValidatedAt ? Date.parse(profile.lastValidatedAt) : NaN;
+  if (!Number.isFinite(validatedAt)) {
+    return false;
+  }
+
+  const nowMs = now.getTime();
+  if (validatedAt > nowMs + 60_000 || nowMs - validatedAt > PROVIDER_CONNECTION_PROOF_MAX_AGE_MS) {
+    return false;
+  }
+
+  const expiresAt = profile.expiresAt ? Date.parse(profile.expiresAt) : NaN;
+  return !Number.isFinite(expiresAt) || expiresAt > nowMs;
 }
 
 function normalizeEmail(value: string): string {

@@ -264,6 +264,25 @@ describe('EvaosBrokerSessionClient provider hub', () => {
     });
   });
 
+  it('fails closed when provider profile evidence belongs to a different customer', async () => {
+    const fetchImpl = fetchMock();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          ...providerProfilesResponse([connectedGoogleProfile]),
+          customer_id: 'other-customer',
+        })
+      );
+    const client = authenticatedClient(fetchImpl);
+
+    await expect(client.providerHub({ customerId: 'david-poku' })).rejects.toMatchObject({
+      code: 'broker_invalid_response',
+      message: 'The evaOS broker returned provider profile evidence for a different customer.',
+    });
+  });
+
   it('fails closed instead of rendering empty state when provider list schema is malformed', async () => {
     const fetchImpl = fetchMock();
     fetchImpl
@@ -342,6 +361,29 @@ describe('EvaosBrokerSessionClient provider hub', () => {
     expect(JSON.stringify(result)).not.toMatch(
       /raw-token|access_token|connect_url|\bepg_[A-Za-z0-9_-]+\b|grant_handle|Bearer/i
     );
+  });
+
+  it('fails closed when provider action proof lacks its own audit id', async () => {
+    const fetchImpl = fetchMock();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(
+        jsonResponse({
+          provider_key: 'google_workspace',
+          status: 'pending',
+          source_pointer: 'broker:provider_auth_start:google_workspace',
+          backend_enforced: true,
+        })
+      );
+    const client = authenticatedClient(fetchImpl);
+
+    await expect(
+      client.startProviderAuth({ customerId: 'david-poku', providerKey: 'google_workspace' })
+    ).rejects.toMatchObject({
+      code: 'broker_invalid_response',
+      message: 'The evaOS broker did not return provider action enforcement proof.',
+    });
   });
 
   it('denies provider mutations before action RPCs when policy proof is not backend-enforced', async () => {
@@ -456,6 +498,43 @@ describe('EvaosBrokerSessionClient provider hub', () => {
       .mockResolvedValueOnce(jsonResponse(accountPayload))
       .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
       .mockResolvedValueOnce(jsonResponse(providerProfilesResponse([weakConnectedProfile])));
+
+    await expect(
+      client.switchProvider({ customerId: 'david-poku', providerKey: 'google_workspace' })
+    ).rejects.toMatchObject({
+      code: 'action_denied',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+  });
+
+  it('denies switch and grant minting when connected proof is stale or only handle-shaped', async () => {
+    const handleOnlyProfile = {
+      ...connectedGoogleProfile,
+      last_validated_at: undefined,
+    };
+    const staleProfile = {
+      ...connectedGoogleProfile,
+      last_validated_at: '2026-06-01T11:00:00.000Z',
+    };
+    const fetchImpl = fetchMock();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(jsonResponse(providerProfilesResponse([handleOnlyProfile])));
+    const client = authenticatedClient(fetchImpl);
+
+    await expect(
+      client.mintProviderGrant({ customerId: 'david-poku', providerKey: 'google_workspace', agentRuntime: 'openclaw' })
+    ).rejects.toMatchObject({
+      code: 'action_denied',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(3);
+
+    fetchImpl.mockReset();
+    fetchImpl
+      .mockResolvedValueOnce(jsonResponse(accountPayload))
+      .mockResolvedValueOnce(jsonResponse(policyPayload(['manage_integrations'])))
+      .mockResolvedValueOnce(jsonResponse(providerProfilesResponse([staleProfile])));
 
     await expect(
       client.switchProvider({ customerId: 'david-poku', providerKey: 'google_workspace' })
