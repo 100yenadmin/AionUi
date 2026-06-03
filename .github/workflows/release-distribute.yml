@@ -49,7 +49,7 @@ jobs:
             echo "::error::Refusing to distribute non-evaOS beta tag: $TAG"
             exit 1
           fi
-          if [[ "$TAG" == *"-dev-"* || "$TAG" == *"-dev."* ]]; then
+          if [[ "$TAG" == *"-dev" || "$TAG" == *"-dev-"* || "$TAG" == *"-dev."* ]]; then
             echo "::error::Refusing to distribute development beta tag: $TAG"
             exit 1
           fi

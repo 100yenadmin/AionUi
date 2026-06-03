@@ -127,7 +127,7 @@ function hasEvaosBetaVersionMarker(tag) {
 }
 
 function isDevBetaTag(tag) {
-  return /(^|-)dev-/.test(tag) || /-dev\./.test(tag);
+  return /(^|-)dev($|[-.])/.test(tag);
 }
 
 function assertEvaosBetaReleaseTag(tag) {
@@ -157,6 +157,7 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
   const packageJson = readJson(rootDir, 'package.json');
   const builder = readText(rootDir, 'packages/desktop/electron-builder.yml');
   const buildRelease = readText(rootDir, '.github/workflows/build-and-release.yml');
+  const prChecks = readText(rootDir, '.github/workflows/pr-checks.yml');
   const distribute = readText(rootDir, '.github/workflows/release-distribute.yml');
   const reusableBuild = readText(rootDir, '.github/workflows/_build-reusable.yml');
   const afterSign = readText(rootDir, 'scripts/afterSign.js');
@@ -248,6 +249,7 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
     '.github/workflows/release-distribute.yml',
     issues
   );
+  requireText(distribute, '*"-dev"', '.github/workflows/release-distribute.yml', issues, 'terminal dev tag rejection');
   requireText(distribute, 'merge-base --is-ancestor', '.github/workflows/release-distribute.yml', issues);
   requireText(
     distribute,
@@ -277,6 +279,8 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
   requireText(afterSign, 'assertPublicBetaNotarizationEnv', 'scripts/afterSign.js', issues);
   requireText(afterSign, 'EVAOS_BETA_REQUIRE_SIGNING', 'scripts/afterSign.js', issues);
   requireText(afterSign, 'Ad-hoc signing is not allowed', 'scripts/afterSign.js', issues);
+
+  requireText(prChecks, "'evaos/**'", '.github/workflows/pr-checks.yml', issues, 'EVAOS stacked PR branch trigger');
 
   requireText(prepareAssets, 'Refusing upstream-branded beta asset', 'scripts/prepare-release-assets.sh', issues);
   requireText(

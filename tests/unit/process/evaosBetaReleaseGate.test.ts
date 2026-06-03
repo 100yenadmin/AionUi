@@ -66,6 +66,9 @@ describe('evaOS beta release gate', () => {
     expect(() => releaseGate.assertPublicDistributionTag('evaos-beta-v2.1.10-evaos-beta.0-dev-abc123')).toThrow(
       /development beta tag/
     );
+    expect(() => releaseGate.assertPublicDistributionTag('evaos-beta-v2.1.10-evaos-beta-dev')).toThrow(
+      /development beta tag/
+    );
     expect(() => releaseGate.assertPublicDistributionTag('evaos-beta-v2.1.10')).toThrow(/evaos-beta version marker/);
     expect(() => releaseGate.assertPublicDistributionTag('v2.1.10')).toThrow(/non-evaOS beta tag/);
   });
