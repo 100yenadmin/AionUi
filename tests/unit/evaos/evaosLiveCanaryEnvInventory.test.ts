@@ -10,6 +10,12 @@ const inventory = require('../../../scripts/evaosLiveCanaryEnvInventory.js') as 
     missingOneOf: string[][];
   };
   renderMarkdown: (report: ReturnType<typeof inventory.auditEnvironmentInventory>) => string;
+  renderProvisioningTemplate: (options?: {
+    repo?: string;
+    environment?: string;
+    branch?: string;
+    proofRef?: string;
+  }) => string;
 };
 
 const completeSecrets = [
@@ -86,5 +92,47 @@ describe('evaOS live canary GitHub environment inventory', () => {
     expect(markdown).toContain('AIONUI_EVAOS_CUSTOMER_ID');
     expect(markdown).not.toContain('eds_live_session_for_test');
     expect(markdown).not.toContain('https://workspace.example.test');
+  });
+
+  it('renders placeholder-only provisioning commands from the same fixture contract', () => {
+    const template = inventory.renderProvisioningTemplate({
+      repo: '100yenadmin/AionUi',
+      environment: 'evaos-staging',
+      branch: 'evaos/dev',
+      proofRef: 'https://github.com/100yenadmin/AionUi/issues/41',
+    });
+
+    expect(template).toContain('gh secret set AIONUI_EVAOS_DESKTOP_SESSION');
+    expect(template).toContain('gh variable set AIONUI_EVAOS_CUSTOMER_ID');
+    expect(template).toContain('AIONUI_EVAOS_COMPANY_BRAIN_DENIED_SESSION');
+    expect(template).toContain('AIONUI_EVAOS_COMPANY_BRAIN_WRONG_CUSTOMER_ID');
+    expect(template).toContain('gh workflow run evaos-live-canary-proof.yml');
+    expect(template).toContain("--ref 'evaos/dev'");
+    expect(template).toContain('-f live_canary_ack=evaos-live-canary');
+    expect(template).toContain("-f proof_ref='https://github.com/100yenadmin/AionUi/issues/41'");
+    expect(template).toContain(
+      "node scripts/evaosLiveCanaryEnvInventory.js --repo '100yenadmin/AionUi' --env 'evaos-staging' --strict --markdown"
+    );
+    expect(template).not.toContain('eds_live_session_for_test');
+    expect(template).not.toContain('https://workspace.example.test');
+  });
+
+  it('shell-quotes operator-controlled template arguments', () => {
+    const template = inventory.renderProvisioningTemplate({
+      repo: "100yenadmin/AionUi; echo PWN 'x'",
+      environment: 'evaos-staging; echo ENV',
+      branch: 'evaos/dev; echo BRANCH',
+      proofRef: "https://github.com/100yenadmin/AionUi/issues/41; echo 'TOKEN'",
+    });
+
+    expect(template).toContain("-R '100yenadmin/AionUi; echo PWN '\"'\"'x'\"'\"''");
+    expect(template).toContain("--env 'evaos-staging; echo ENV'");
+    expect(template).toContain("--ref 'evaos/dev; echo BRANCH'");
+    expect(template).toContain(
+      "-f proof_ref='https://github.com/100yenadmin/AionUi/issues/41; echo '\"'\"'TOKEN'\"'\"''"
+    );
+    expect(template).not.toContain('-R 100yenadmin/AionUi; echo PWN');
+    expect(template).not.toContain('--ref evaos/dev; echo BRANCH');
+    expect(template).not.toContain('-f proof_ref=https://github.com/100yenadmin/AionUi/issues/41; echo');
   });
 });

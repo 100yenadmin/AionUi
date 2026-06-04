@@ -19,6 +19,7 @@
     "cli": "electron-vite dev --config packages/desktop/electron.vite.config.ts",
     "webui": "tsx scripts/webui.ts",
     "evaos:local-shell-smoke": "node scripts/evaosLocalShellSmoke.js",
+    "evaos:live-canary-fixtures": "node scripts/evaosLiveCanaryEnvInventory.js --provisioning-template",
     "webui:remote": "tsx scripts/webui.ts --remote",
     "webui:prod": "cross-env NODE_ENV=production tsx scripts/webui.ts",
     "webui:prod:remote": "cross-env NODE_ENV=production tsx scripts/webui.ts --remote",
