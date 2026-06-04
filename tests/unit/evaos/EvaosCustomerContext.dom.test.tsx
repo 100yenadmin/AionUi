@@ -4,7 +4,9 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { act, renderHook, waitFor } from '@testing-library/react';
+import React from 'react';
+import { act, render, renderHook, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { clearEvaosCustomerContext, useEvaosCustomerContext } from '@/renderer/hooks/context/EvaosCustomerContext';
 
@@ -68,6 +70,19 @@ function deferred<T>() {
   });
   return { promise, resolve };
 }
+
+const CustomerContextProbe: React.FC = () => {
+  const context = useEvaosCustomerContext(true);
+
+  return (
+    <div>
+      <p>{context.summaryText}</p>
+      <p>{context.error ?? 'no error'}</p>
+      <p>{context.selectedTarget?.displayName ?? 'no selected target'}</p>
+      <button onClick={() => void context.refreshTargets()}>Refresh</button>
+    </div>
+  );
+};
 
 describe('EvaosCustomerContext', () => {
   beforeEach(() => {
@@ -155,5 +170,66 @@ describe('EvaosCustomerContext', () => {
 
     await waitFor(() => expect(result.current.error).toBe('Customer targets failed closed.'));
     expect(JSON.stringify(result.current)).not.toMatch(/eds_raw_customer_target_secret|Bearer|desktop_session/);
+  });
+
+  it('sanitizes secret-shaped customer target display names and summary text', async () => {
+    const user = userEvent.setup();
+    brokerMocks.getCustomerTargets.mockResolvedValue({
+      success: true,
+      data: {
+        roles: ['admin'],
+        isOperator: true,
+        defaultCustomerId: 'customer_safe',
+        selectedCustomerId: 'customer_safe',
+        customers: [
+          {
+            customerId: 'customer_safe',
+            displayName: 'eds_target_secret should not render',
+            status: 'active',
+            healthStatus: 'ready',
+            isDefault: true,
+          },
+        ],
+        summaryText: 'Bearer desktop_session should not render',
+      },
+    });
+
+    const { container } = render(<CustomerContextProbe />);
+
+    await user.click(screen.getByRole('button', { name: /^refresh$/i }));
+
+    expect(await screen.findByText('1 customer target loaded')).toBeInTheDocument();
+    expect(screen.getByText('customer_safe')).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/eds_target_secret|Bearer|desktop_session/i);
+  });
+
+  it('does not render a secret-shaped customer id as display fallback', async () => {
+    const user = userEvent.setup();
+    brokerMocks.getCustomerTargets.mockResolvedValue({
+      success: true,
+      data: {
+        roles: ['admin'],
+        isOperator: true,
+        defaultCustomerId: 'eds_customer_secret',
+        selectedCustomerId: 'eds_customer_secret',
+        customers: [
+          {
+            customerId: 'eds_customer_secret',
+            displayName: 'refresh_token should not render',
+            status: 'active',
+            healthStatus: 'ready',
+            isDefault: true,
+          },
+        ],
+        summaryText: '1 customer target loaded',
+      },
+    });
+
+    const { container } = render(<CustomerContextProbe />);
+
+    await user.click(screen.getByRole('button', { name: /^refresh$/i }));
+
+    expect(await screen.findByText('Customer target')).toBeInTheDocument();
+    expect(container.textContent).not.toMatch(/eds_customer_secret|refresh_token/i);
   });
 });

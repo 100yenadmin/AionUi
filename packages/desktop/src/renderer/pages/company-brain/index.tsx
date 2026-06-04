@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { Button, Input, Spin, Tag } from '@arco-design/web-react';
 import { Attention, Brain, Refresh, Search } from '@icon-park/react';
+import { useEvaosCustomerContext } from '@renderer/hooks/context/EvaosCustomerContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import {
   evaosCompanyBrain,
@@ -45,7 +46,6 @@ function severityColor(severity: IEvaosCompanyBrainExceptionSeverity): 'red' | '
 const CompanyBrainPage: React.FC = () => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
-  const [customerId, setCustomerId] = useState('');
   const [directory, setDirectory] = useState<IEvaosCompanyBrainDirectoryView | null>(null);
   const [selectedAccount, setSelectedAccount] = useState<IEvaosCompanyBrainAccount360View | null>(null);
   const [queryResult, setQueryResult] = useState<IEvaosCompanyBrainQueryResult | null>(null);
@@ -54,87 +54,204 @@ const CompanyBrainPage: React.FC = () => {
   const [loadingDirectory, setLoadingDirectory] = useState(false);
   const [loadingAccountId, setLoadingAccountId] = useState<string | null>(null);
   const [querying, setQuerying] = useState(false);
+  const customerContext = useEvaosCustomerContext(true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const selectedAccountRef = useRef<IEvaosCompanyBrainAccount360View | null>(selectedAccount);
+  const requestEpochRef = useRef(0);
+  const accountRequestEpochRef = useRef(0);
+  const queryRequestEpochRef = useRef(0);
+  const activeAccountRequestRef = useRef<{ epoch: number; customerId: string; accountId: string } | null>(null);
 
   const clearEvidence = useCallback(() => {
     setDirectory(null);
     setSelectedAccount(null);
+    selectedAccountRef.current = null;
     setQueryResult(null);
     setBrainError(null);
+    setLoadingDirectory(false);
+    setLoadingAccountId(null);
+    setQuerying(false);
+    activeAccountRequestRef.current = null;
   }, []);
 
-  const handleCustomerChange = useCallback(
-    (value: string) => {
-      setCustomerId(value);
+  useEffect(() => {
+    selectedCustomerRef.current = customerContext.selectedCustomerId;
+    requestEpochRef.current += 1;
+    accountRequestEpochRef.current += 1;
+    queryRequestEpochRef.current += 1;
+    clearEvidence();
+  }, [clearEvidence, customerContext.selectedCustomerId]);
+
+  useEffect(() => {
+    selectedAccountRef.current = selectedAccount;
+  }, [selectedAccount]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
+  }, []);
+
+  const isCurrentAccountRequest = useCallback((epoch: number, customerId: string, accountId: string) => {
+    return (
+      accountRequestEpochRef.current === epoch &&
+      activeAccountRequestRef.current?.epoch === epoch &&
+      activeAccountRequestRef.current.customerId === customerId &&
+      activeAccountRequestRef.current.accountId === accountId &&
+      selectedCustomerRef.current === customerId
+    );
+  }, []);
+
+  const isCurrentQueryRequest = useCallback((epoch: number, customerId: string, accountId: string) => {
+    return (
+      queryRequestEpochRef.current === epoch &&
+      selectedCustomerRef.current === customerId &&
+      selectedAccountRef.current?.accountId === accountId
+    );
+  }, []);
+
+  const selectCustomer = useCallback(
+    (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
+      accountRequestEpochRef.current += 1;
+      queryRequestEpochRef.current += 1;
+      customerContext.selectCustomer(customerId);
       clearEvidence();
     },
-    [clearEvidence]
+    [clearEvidence, customerContext]
   );
 
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    accountRequestEpochRef.current += 1;
+    queryRequestEpochRef.current += 1;
+    selectedCustomerRef.current = undefined;
+    clearEvidence();
+    await customerContext.refreshTargets();
+  }, [clearEvidence, customerContext]);
+
   const loadDirectory = useCallback(async () => {
-    const trimmedCustomerId = customerId.trim();
+    const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
     setBrainError(null);
     setSelectedAccount(null);
+    selectedAccountRef.current = null;
     setQueryResult(null);
-    if (!trimmedCustomerId) {
+    accountRequestEpochRef.current += 1;
+    queryRequestEpochRef.current += 1;
+    activeAccountRequestRef.current = null;
+    if (!selectedCustomerId) {
       setDirectory(null);
       setBrainError('Choose a customer before loading Company Brain.');
       return;
     }
 
+    const requestEpoch = requestEpochRef.current + 1;
+    requestEpochRef.current = requestEpoch;
+    selectedCustomerRef.current = selectedCustomerId;
     setLoadingDirectory(true);
     try {
-      const response = await evaosCompanyBrain.getDirectory.invoke({ customerId: trimmedCustomerId });
+      const response = await evaosCompanyBrain.getDirectory.invoke({ customerId: selectedCustomerId });
+      if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+        return;
+      }
       if (!response.success || !response.data) {
         setDirectory(null);
         setBrainError(safeUiText(response.msg, 'Company Brain failed closed.'));
         return;
       }
+      if (response.data.customerId !== selectedCustomerId) {
+        setDirectory(null);
+        setBrainError('Company Brain broker returned evidence for a different customer.');
+        return;
+      }
       setDirectory(response.data);
     } catch {
+      if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+        return;
+      }
       setDirectory(null);
       setBrainError('Company Brain broker request failed closed.');
     } finally {
-      setLoadingDirectory(false);
+      if (isCurrentRequest(requestEpoch, selectedCustomerId)) {
+        setLoadingDirectory(false);
+      }
     }
-  }, [customerId]);
+  }, [customerContext.selectedCustomerId, isCurrentRequest]);
 
   const loadAccount = useCallback(
     async (account: IEvaosCompanyBrainAccountSummaryView) => {
-      const trimmedCustomerId = customerId.trim();
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       if (!directory || directory.routeDenied) {
         setBrainError('Action denied by account policy.');
         return;
       }
+      if (!selectedCustomerId) {
+        setBrainError('Choose a customer before loading Company Brain.');
+        return;
+      }
 
+      const requestEpoch = accountRequestEpochRef.current + 1;
+      accountRequestEpochRef.current = requestEpoch;
+      activeAccountRequestRef.current = {
+        epoch: requestEpoch,
+        customerId: selectedCustomerId,
+        accountId: account.accountId,
+      };
+      queryRequestEpochRef.current += 1;
       setBrainError(null);
+      selectedAccountRef.current = null;
       setQueryResult(null);
       setLoadingAccountId(account.accountId);
       try {
         const response = await evaosCompanyBrain.getAccount360.invoke({
-          customerId: trimmedCustomerId,
+          customerId: selectedCustomerId,
           accountId: account.accountId,
         });
+        if (!isCurrentAccountRequest(requestEpoch, selectedCustomerId, account.accountId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setSelectedAccount(null);
+          selectedAccountRef.current = null;
           setBrainError(safeUiText(response.msg, 'Backend denied the Company Brain request.'));
           return;
         }
+        if (
+          response.data.customerId !== selectedCustomerId ||
+          response.data.accountId !== account.accountId ||
+          response.data.account.accountId !== account.accountId
+        ) {
+          setSelectedAccount(null);
+          selectedAccountRef.current = null;
+          setBrainError('Company Brain broker returned account evidence for the wrong customer or account.');
+          return;
+        }
+        selectedAccountRef.current = response.data;
         setSelectedAccount(response.data);
       } catch {
+        if (!isCurrentAccountRequest(requestEpoch, selectedCustomerId, account.accountId)) {
+          return;
+        }
         setSelectedAccount(null);
+        selectedAccountRef.current = null;
         setBrainError('Backend denied the Company Brain request.');
       } finally {
-        setLoadingAccountId(null);
+        if (isCurrentAccountRequest(requestEpoch, selectedCustomerId, account.accountId)) {
+          setLoadingAccountId(null);
+        }
       }
     },
-    [customerId, directory]
+    [customerContext.selectedCustomerId, directory, isCurrentAccountRequest]
   );
 
   const askCompanyBrain = useCallback(async () => {
-    const trimmedCustomerId = customerId.trim();
+    const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
     const trimmedQuery = queryText.trim();
     if (!selectedAccount || selectedAccount.routeDenied) {
       setBrainError('Choose a Company Brain account before asking a question.');
+      return;
+    }
+    if (!selectedCustomerId) {
+      setBrainError('Choose a customer before querying Company Brain.');
       return;
     }
     if (!trimmedQuery) {
@@ -142,32 +259,50 @@ const CompanyBrainPage: React.FC = () => {
       return;
     }
 
+    const accountId = selectedAccount.accountId;
+    const requestEpoch = queryRequestEpochRef.current + 1;
+    queryRequestEpochRef.current = requestEpoch;
     setBrainError(null);
     setQuerying(true);
     try {
       const response = await evaosCompanyBrain.query.invoke({
-        customerId: trimmedCustomerId,
-        accountId: selectedAccount.accountId,
+        customerId: selectedCustomerId,
+        accountId,
         query: trimmedQuery,
       });
+      if (!isCurrentQueryRequest(requestEpoch, selectedCustomerId, accountId)) {
+        return;
+      }
       if (!response.success || !response.data) {
         setQueryResult(null);
         setBrainError(safeUiText(response.msg, 'Backend denied the Company Brain query.'));
         return;
       }
+      if (response.data.customerId !== selectedCustomerId || response.data.accountId !== accountId) {
+        setQueryResult(null);
+        setBrainError('Company Brain broker returned query evidence for the wrong customer or account.');
+        return;
+      }
       setQueryResult(response.data);
     } catch {
+      if (!isCurrentQueryRequest(requestEpoch, selectedCustomerId, accountId)) {
+        return;
+      }
       setQueryResult(null);
       setBrainError('Backend denied the Company Brain query.');
     } finally {
-      setQuerying(false);
+      if (isCurrentQueryRequest(requestEpoch, selectedCustomerId, accountId)) {
+        setQuerying(false);
+      }
     }
-  }, [customerId, queryText, selectedAccount]);
+  }, [customerContext.selectedCustomerId, isCurrentQueryRequest, queryText, selectedAccount]);
 
   const exceptionCount = useMemo(
     () => directory?.accounts.reduce((total, account) => total + account.exceptionCount, 0) ?? 0,
     [directory?.accounts]
   );
+  const selectedCustomerLabel =
+    customerContext.selectedTarget?.displayName ?? customerContext.selectedCustomerId ?? 'No customer selected';
 
   return (
     <div
@@ -188,6 +323,7 @@ const CompanyBrainPage: React.FC = () => {
             type='primary'
             icon={<Refresh theme='outline' size='16' />}
             loading={loadingDirectory}
+            disabled={!customerContext.selectedCustomerId}
             onClick={() => void loadDirectory()}
           >
             Refresh
@@ -195,21 +331,48 @@ const CompanyBrainPage: React.FC = () => {
         </header>
 
         <section className='rounded-8px border border-solid border-[var(--color-border-2)] bg-fill-1 p-14px'>
-          <label className='block text-13px font-medium leading-20px text-t-primary' htmlFor='brain-customer-id'>
-            Customer context
-          </label>
-          <div className='mt-8px flex gap-8px max-[520px]:flex-col'>
-            <Input
-              id='brain-customer-id'
-              value={customerId}
-              placeholder='Customer ID or slug'
-              onChange={handleCustomerChange}
-              onPressEnter={() => void loadDirectory()}
-            />
-            <Button className='shrink-0' loading={loadingDirectory} onClick={() => void loadDirectory()}>
-              Load
-            </Button>
+          <div className='flex flex-wrap items-center justify-between gap-10px'>
+            <div className='min-w-0'>
+              <div className='text-13px font-medium leading-20px text-t-primary'>Customer context</div>
+              <div className='mt-2px truncate text-12px leading-18px text-t-secondary'>
+                {customerContext.loading ? 'Loading customer targets...' : selectedCustomerLabel}
+              </div>
+            </div>
+            <div className='flex shrink-0 flex-wrap gap-8px'>
+              <Button loading={customerContext.loading} onClick={() => void refreshCustomerTargets()}>
+                Refresh targets
+              </Button>
+              <Button
+                className='shrink-0'
+                loading={loadingDirectory || customerContext.loading}
+                disabled={!customerContext.selectedCustomerId}
+                onClick={() => void loadDirectory()}
+              >
+                Load
+              </Button>
+            </div>
           </div>
+          <div className='mt-10px flex flex-wrap gap-8px'>
+            {customerContext.targets.length === 0 ? (
+              <Tag color={customerContext.error ? 'orange' : 'gray'}>
+                {customerContext.error ?? customerContext.summaryText}
+              </Tag>
+            ) : (
+              customerContext.targets.map((target) => (
+                <Button
+                  key={target.customerId}
+                  size='small'
+                  type={target.customerId === customerContext.selectedCustomerId ? 'primary' : 'secondary'}
+                  onClick={() => selectCustomer(target.customerId)}
+                >
+                  {target.displayName}
+                </Button>
+              ))
+            )}
+          </div>
+          <p className='m-0 mt-8px text-12px leading-18px text-t-secondary'>
+            {customerContext.summaryText}. Company Brain stays scoped to the selected customer.
+          </p>
           {brainError ? (
             <p className='m-0 mt-8px text-12px leading-18px text-[rgb(var(--warning-6))]'>{brainError}</p>
           ) : null}
@@ -446,7 +609,7 @@ const Account360Panel: React.FC<{
           className='shrink-0'
           type='primary'
           icon={<Search theme='outline' size='15' />}
-          loading={querying}
+          aria-busy={querying}
           onClick={onAsk}
         >
           Ask

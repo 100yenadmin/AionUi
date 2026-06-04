@@ -102,8 +102,10 @@ describe('evaOS local shell smoke', () => {
   it('exercises customer-target recovery on product routes that depend on Workbench customer context', () => {
     for (const routeName of [
       'people-access-empty-error',
+      'approval-center-empty-error',
       'connected-apps-empty-error',
       'business-browser-empty-error',
+      'company-brain-empty-error',
     ]) {
       const route = localShellSmoke.ROUTE_CHECKS.find((check) => check.name === routeName);
       expect(route?.action).toBe('click-refresh-targets');
