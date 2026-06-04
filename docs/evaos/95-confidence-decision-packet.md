@@ -128,6 +128,28 @@ Required local smoke proof:
 - Missing session, empty data, offline, and unavailable broker states fail closed with user-honest copy.
 - Any launch or UX blocker found during the smoke is filed, fixed, and re-smoked before the next feature slice starts.
 
+## Live Canary Fixture Provisioning
+
+Use the repo-owned placeholder template to provision `evaos-staging` fixture names instead of copying one-off issue comments:
+
+```bash
+npm run evaos:live-canary-fixtures -- \
+  --repo 100yenadmin/AionUi \
+  --env evaos-staging \
+  --branch evaos/dev \
+  --proof-ref https://github.com/100yenadmin/AionUi/issues/41
+```
+
+The package script runs `node scripts/evaosLiveCanaryEnvInventory.js --provisioning-template`. The template is placeholder-only and must never be committed or posted with real session, token, provider grant, customer credential, or browser URL secret values filled in.
+
+After provisioning, rerun the strict inventory:
+
+```bash
+node scripts/evaosLiveCanaryEnvInventory.js --repo 100yenadmin/AionUi --env evaos-staging --strict --markdown
+```
+
+Only after the strict inventory passes should an agent dispatch `evaOS Live Canary Proof` with `run_live_canaries=true`.
+
 ## Post-Merge Sprint State
 
 - The sprint stack is landed on `evaos/dev`.

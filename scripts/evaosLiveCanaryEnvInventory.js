@@ -56,6 +56,12 @@ const RECOMMENDED_VARIABLES = [
   'AIONUI_EVAOS_APPROVAL_DENY_REASON',
 ];
 
+const RECOMMENDED_VARIABLE_DEFAULTS = {
+  AIONUI_EVAOS_RUNTIME: 'browser',
+  AIONUI_EVAOS_PROVIDER_REQUIRED_STATES: 'connected,needs_login,expired,revoked,approval_required',
+  AIONUI_EVAOS_APPROVAL_DENY_REASON: 'evaOS beta deny-loop canary',
+};
+
 const REQUIRED_ONE_OF_FIXTURES = [
   {
     names: ['AIONUI_EVAOS_COMPANY_BRAIN_WRONG_CUSTOMER_ID', 'AIONUI_EVAOS_COMPANY_BRAIN_DENIED_SESSION'],
@@ -166,6 +172,94 @@ function renderMarkdown(report) {
   return `${lines.join('\n').trim()}\n`;
 }
 
+function valuePlaceholder(name) {
+  return `<replace-${String(name).toLowerCase().replaceAll('_', '-')}>`;
+}
+
+function secretCommand(name, repo, environment) {
+  return `gh secret set ${name} -R ${repo} --env ${environment}`;
+}
+
+function variableCommand(name, repo, environment, value = valuePlaceholder(name)) {
+  return `gh variable set ${name} -R ${repo} --env ${environment} --body '${value}'`;
+}
+
+function commandForFixture(fixture, repo, environment) {
+  if (fixture.kind === 'secret') {
+    return secretCommand(fixture.name, repo, environment);
+  }
+  return variableCommand(fixture.name, repo, environment);
+}
+
+function renderProvisioningTemplate(options = {}) {
+  const repo = options.repo || '100yenadmin/AionUi';
+  const environment = options.environment || 'evaos-staging';
+  const branch = options.branch || 'evaos/dev';
+  const proofRef = options.proofRef || 'https://github.com/100yenadmin/AionUi/issues/41';
+  const lines = [
+    '# evaOS Live Canary Fixture Provisioning Template',
+    '',
+    'This template is name-only and placeholder-only. Do not paste real secret values into GitHub comments, docs, session notes, screenshots, or packet files.',
+    '',
+    '## Required Secrets',
+    '',
+  ];
+
+  for (const fixture of REQUIRED_SINGLE_FIXTURES.filter((entry) => entry.kind === 'secret')) {
+    lines.push(`# ${fixture.reason}`);
+    lines.push(commandForFixture(fixture, repo, environment));
+    lines.push('');
+  }
+
+  lines.push('## Required Variables Or Secret-Backed Values', '');
+  for (const fixture of REQUIRED_SINGLE_FIXTURES.filter((entry) => entry.kind !== 'secret')) {
+    lines.push(`# ${fixture.reason}`);
+    lines.push(commandForFixture(fixture, repo, environment));
+    lines.push(`# If this value is sensitive, store it as a secret instead:`);
+    lines.push(secretCommand(fixture.name, repo, environment));
+    lines.push('');
+  }
+
+  lines.push('## Required One-Of Negative Fixtures', '');
+  for (const group of REQUIRED_ONE_OF_FIXTURES) {
+    lines.push(`# ${group.reason}`);
+    for (const name of group.names) {
+      if (name.endsWith('_DENIED_SESSION')) {
+        lines.push(secretCommand(name, repo, environment));
+      } else {
+        lines.push(variableCommand(name, repo, environment));
+        lines.push(`# If ${name} is sensitive, store it as a secret instead:`);
+        lines.push(secretCommand(name, repo, environment));
+      }
+    }
+    lines.push('');
+  }
+
+  lines.push('## Recommended Non-Secret Defaults', '');
+  for (const name of RECOMMENDED_VARIABLES) {
+    lines.push(variableCommand(name, repo, environment, RECOMMENDED_VARIABLE_DEFAULTS[name] || valuePlaceholder(name)));
+  }
+
+  lines.push(
+    '',
+    '## Verify Inventory',
+    '',
+    `node scripts/evaosLiveCanaryEnvInventory.js --repo ${repo} --env ${environment} --strict --markdown`,
+    '',
+    '## Dispatch Live Canary Proof',
+    '',
+    [
+      `gh workflow run evaos-live-canary-proof.yml -R ${repo}`,
+      `--ref ${branch}`,
+      '-f live_canary_ack=evaos-live-canary',
+      '-f run_live_canaries=true',
+      `-f proof_ref=${proofRef}`,
+    ].join(' ')
+  );
+
+  return `${lines.join('\n').trim()}\n`;
+}
+
 function ghJson(args) {
   const output = execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
   return JSON.parse(output || '[]');
@@ -186,14 +280,20 @@ function parseArgs(argv) {
     environment: 'evaos-staging',
     markdown: false,
     strict: false,
+    provisioningTemplate: false,
+    branch: 'evaos/dev',
+    proofRef: 'https://github.com/100yenadmin/AionUi/issues/41',
   };
 
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--repo') options.repo = argv[(index += 1)];
-    if (arg === '--env') options.environment = argv[(index += 1)];
+    if (arg === '--env' || arg === '--environment') options.environment = argv[(index += 1)];
     if (arg === '--markdown') options.markdown = true;
     if (arg === '--strict') options.strict = true;
+    if (arg === '--provisioning-template') options.provisioningTemplate = true;
+    if (arg === '--branch') options.branch = argv[(index += 1)];
+    if (arg === '--proof-ref') options.proofRef = argv[(index += 1)];
   }
 
   return options;
@@ -201,6 +301,18 @@ function parseArgs(argv) {
 
 function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (options.provisioningTemplate) {
+    process.stdout.write(
+      renderProvisioningTemplate({
+        repo: options.repo,
+        environment: options.environment,
+        branch: options.branch,
+        proofRef: options.proofRef,
+      })
+    );
+    return;
+  }
+
   const inventory = listGithubEnvironmentInventory(options.repo, options.environment);
   const report = auditEnvironmentInventory(inventory);
 
@@ -225,4 +337,5 @@ module.exports = {
   auditEnvironmentInventory,
   listGithubEnvironmentInventory,
   renderMarkdown,
+  renderProvisioningTemplate,
 };

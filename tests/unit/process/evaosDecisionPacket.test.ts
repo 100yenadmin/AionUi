@@ -33,4 +33,14 @@ describe('evaOS decision packet', () => {
     );
     expect(decisionPacket).toContain('Staging fixtures only block live backend canaries');
   });
+
+  it('documents the repo-owned live canary fixture provisioning template', () => {
+    const decisionPacket = fs.readFileSync(path.join(repoRoot, 'docs/evaos/95-confidence-decision-packet.md'), 'utf8');
+
+    expect(decisionPacket).toContain('## Live Canary Fixture Provisioning');
+    expect(decisionPacket).toContain('npm run evaos:live-canary-fixtures');
+    expect(decisionPacket).toContain('--provisioning-template');
+    expect(decisionPacket).toContain('The template is placeholder-only');
+    expect(decisionPacket).toContain('After provisioning, rerun the strict inventory');
+  });
 });
