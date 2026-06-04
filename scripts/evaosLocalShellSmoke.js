@@ -161,6 +161,44 @@ const ROUTE_CHECKS = [
   },
 ];
 
+const LOCAL_PRODUCT_ROUTE_CHECKS = [
+  {
+    name: 'connected-apps-loaded-fixture',
+    hash: '/connected-apps',
+    title: 'Connected Apps',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Connected Apps',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Google Workspace',
+      'fixture-audit-providers',
+    ],
+    loadedStateRequiredMarkers: ['provider profile cards', 'grant/revoke status badges', 'provider source pointer'],
+    action: 'click-load',
+    isolateRendererState: true,
+    expected: [
+      'Connected Apps',
+      'Brokered provider status, grants, and revocation',
+      'Acme Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Google Workspace',
+      'Slack',
+      'Notion',
+      'GitHub',
+      'Linear',
+      'Ready',
+      'Needs login',
+      'Needs reconnection',
+      'Revoked',
+      'Approval required',
+      'auditable handle',
+      'local-fixture:provider_profiles',
+      'fixture-audit-providers',
+    ],
+    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
+  },
+];
+
 const TEAM_ROUTE_CHECK = {
   name: 'team-route-redirect',
   hash: '/team/local-smoke',
@@ -205,6 +243,14 @@ function shellSmokeEnv(artifactsDir, env = process.env) {
     AIONUI_EVAOS_BETA: '1',
     NODE_ENV: 'production',
   };
+}
+
+function isLocalProductFixtureMode(env = process.env) {
+  return env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE === '1';
+}
+
+function routeChecksForEnv(env = process.env) {
+  return isLocalProductFixtureMode(env) ? LOCAL_PRODUCT_ROUTE_CHECKS : ROUTE_CHECKS;
 }
 
 function textFindings(route, text, expected, forbidden, minLength = 80) {
@@ -275,6 +321,14 @@ function loadPlaywrightElectron(repoRoot, requirePlaywright) {
 
 async function clickLoad(page) {
   const loadButton = page.getByRole('button', { name: /^Load$/ }).first();
+  await loadButton.waitFor({ state: 'visible', timeout: 10000 });
+  await page.waitForFunction(
+    () =>
+      Array.from(document.querySelectorAll('button')).some(
+        (button) => button.textContent?.trim() === 'Load' && !button.disabled
+      ),
+    { timeout: 10000 }
+  );
   await loadButton.click();
   await page.waitForTimeout(250);
 }
@@ -330,6 +384,15 @@ async function waitForRoute(page, title) {
   await page.waitForTimeout(450);
 }
 
+async function waitForSettledMarkers(page, markers) {
+  for (const marker of markers) {
+    await page.waitForFunction((expectedMarker) => document.body.innerText.includes(expectedMarker), marker, {
+      timeout: 10000,
+    });
+  }
+  await page.waitForTimeout(250);
+}
+
 async function routeScreenshot(page, screenshotsDir, routeName) {
   const screenshotPath = path.join(screenshotsDir, `${routeName}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -364,12 +427,13 @@ function writeProof({ artifactRoot, artifactsDir, report }) {
       '',
       '## Routes',
       '',
-      ...report.routes.map(
-        (result) =>
-          `- ${result.route}: ${result.screenshotPath} (${result.proofStage}; loaded markers pending: ${result.loadedStateRequiredMarkers.join(
-            ', '
-          )})`
-      ),
+      ...report.routes.map((result) => {
+        const markerLabel =
+          result.proofStage === PROOF_STAGES.PRODUCT_LOADED_STATE ? 'loaded markers' : 'loaded markers pending';
+        return `- ${result.route}: ${result.screenshotPath} (${result.proofStage}; ${markerLabel}: ${result.loadedStateRequiredMarkers.join(
+          ', '
+        )})`;
+      }),
       '',
       '## Findings',
       '',
@@ -389,6 +453,8 @@ async function runLocalShellSmoke(options = {}) {
   const artifactRoot = options.artifactRoot || DEFAULT_ARTIFACT_ROOT;
   const { screenshotsDir, artifactsDir } = ensureDirs(artifactRoot);
   const electron = options.electron?._electron || options.electron || loadPlaywrightElectron(repoRoot);
+  const launchEnv = shellSmokeEnv(artifactsDir, options.env || process.env);
+  const routeChecks = options.routeChecks || routeChecksForEnv(launchEnv);
   const consoleMessages = [];
   const pageErrors = [];
   const results = [];
@@ -397,7 +463,7 @@ async function runLocalShellSmoke(options = {}) {
   const app = await electron.launch({
     args: ['.'],
     cwd: repoRoot,
-    env: shellSmokeEnv(artifactsDir, options.env || process.env),
+    env: launchEnv,
   });
 
   try {
@@ -416,7 +482,7 @@ async function runLocalShellSmoke(options = {}) {
     await navigate(page, '/mission-control');
     await waitForRoute(page, 'Mission Control');
 
-    for (const check of ROUTE_CHECKS) {
+    for (const check of routeChecks) {
       console.log(`[evaos-local-shell-smoke] route ${check.name} -> #${check.hash}`);
       await navigate(page, check.hash);
       if (check.isolateRendererState) {
@@ -442,6 +508,7 @@ async function runLocalShellSmoke(options = {}) {
       } else if (check.action === 'click-refresh-targets') {
         await clickRefreshTargets(page);
       }
+      await waitForSettledMarkers(page, check.settledMarkers);
       const text = await page.locator('body').innerText({ timeout: 10000 });
       findings.push(...textFindings(check.name, text, check.expected, check.forbidden));
       const screenshotPath = await routeScreenshot(page, screenshotsDir, check.name);
@@ -520,11 +587,14 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_ARTIFACT_ROOT,
   GLOBAL_FORBIDDEN_PATTERNS,
+  LOCAL_PRODUCT_ROUTE_CHECKS,
   PROOF_STAGES,
   ROUTE_CHECKS,
   TEAM_ROUTE_CHECK,
+  isLocalProductFixtureMode,
   loadPlaywrightElectron,
   relevantConsoleErrors,
+  routeChecksForEnv,
   runLocalShellSmoke,
   shellSmokeEnv,
   textFindings,
