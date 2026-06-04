@@ -13,7 +13,7 @@ const WINDOWS_REQUIRED_PATTERNS = [
   /^packages\/desktop\/src\/common\//,
   /^packages\/desktop\/src\/index\.ts$/,
   /^packages\/desktop\/src\/sentry\.ts$/,
-  /^scripts\/(?:build-with-builder|create-mock-release-artifacts|prepare-release-assets|verify-release-assets|evaosBetaReleaseGate)\.(?:js|sh)$/,
+  /^scripts\/build-with-builder\.js$/,
 ];
 
 function normalizeFilePath(value) {

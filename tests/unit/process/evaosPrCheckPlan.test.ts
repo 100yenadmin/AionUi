@@ -34,6 +34,19 @@ describe('evaOS PR check plan', () => {
     expect(plan.reasons).toContain('.github/workflows/pr-checks.yml');
   });
 
+  it('keeps macOS beta packaging release-safety scripts out of the Windows build gate', () => {
+    const plan = prCheckPlan.planPrChecks([
+      '.github/workflows/evaos-beta-rc-canary.yml',
+      'docs/evaos/public-beta-packaging-rollback.md',
+      'scripts/evaosBetaReleaseGate.js',
+      'scripts/prepare-release-assets.sh',
+      'scripts/verify-release-assets.sh',
+    ]);
+
+    expect(plan.runWindowsChecks).toBe(false);
+    expect(plan.reasons).toEqual([]);
+  });
+
   it('runs Windows checks for cross-platform runtime process and dependency surfaces', () => {
     const plan = prCheckPlan.planPrChecks([
       'package.json',
