@@ -382,12 +382,19 @@ export interface IEvaosBrokerSessionStatus {
   expired: boolean;
   userEmail?: string;
   expiresAt?: string;
-  source: 'none' | 'environment' | 'memory';
+  source: 'none' | 'environment' | 'memory' | 'callback';
   message: string;
 }
 
 export interface IEvaosBrokerClaimDeviceCodeRequest {
   deviceCode: string;
+}
+
+export interface IEvaosBrokerBeginDesktopAuthResult {
+  authUrl: string;
+  callbackUrl: string;
+  fallbackDeviceCode: string;
+  message: string;
 }
 
 export interface IEvaosCustomerTargetView {
@@ -1629,6 +1636,9 @@ export const notification = {
 // ---------------------------------------------------------------------------
 
 export const evaosBroker = {
+  beginDesktopAuth: bridge.buildProvider<IBridgeResponse<IEvaosBrokerBeginDesktopAuthResult>, void>(
+    'evaos.broker.begin-desktop-auth'
+  ),
   claimDeviceCode: bridge.buildProvider<IBridgeResponse<IEvaosBrokerSessionStatus>, IEvaosBrokerClaimDeviceCodeRequest>(
     'evaos.broker.claim-device-code'
   ),

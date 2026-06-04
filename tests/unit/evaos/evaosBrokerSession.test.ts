@@ -142,6 +142,71 @@ describe('EvaosBrokerSessionClient', () => {
     expect(JSON.stringify(status)).not.toContain('access_token');
   });
 
+  it('imports a Workbench loopback callback into main-process state before loading customer targets', async () => {
+    const fetchImpl = fetchMock();
+    fetchImpl.mockResolvedValueOnce(
+      jsonResponse({
+        customers: [
+          {
+            customer_id: 'real-admin-customer',
+            display_name: 'Real Admin Customer',
+            email: 'admin@100yen.org',
+            status: 'active',
+            health_status: 'ready',
+            is_default: true,
+          },
+        ],
+      })
+    );
+    const client = new EvaosBrokerSessionClient({
+      fetchImpl,
+      env: {},
+      now: () => NOW,
+    });
+
+    const status = client.importDesktopSessionFromCallbackUrl(
+      `http://127.0.0.1:49201/auth/callback?desktop_session=eds_callback_session_secret_for_test&desktop_session_expires_at=${encodeURIComponent(
+        FUTURE
+      )}&email=admin%40100yen.org`
+    );
+    const targets = await client.customerTargets();
+
+    expect(status).toEqual({
+      state: 'authenticated',
+      authenticated: true,
+      expired: false,
+      userEmail: 'admin@100yen.org',
+      expiresAt: FUTURE,
+      source: 'callback',
+      message: 'evaOS desktop session is active.',
+    });
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+    expect(requestHeaders(fetchImpl.mock.calls[0]).Authorization).toBe('Bearer eds_callback_session_secret_for_test');
+    expect(requestBody(fetchImpl.mock.calls[0])).toEqual({ action: 'list_customer_targets' });
+    expect(targets.selectedCustomerId).toBe('real-admin-customer');
+    expect(JSON.stringify(status)).not.toContain('eds_callback_session_secret_for_test');
+    expect(JSON.stringify(targets)).not.toContain('eds_callback_session_secret_for_test');
+  });
+
+  it('rejects invalid desktop sign-in callbacks without creating a session', async () => {
+    const fetchImpl = fetchMock();
+    const client = new EvaosBrokerSessionClient({
+      fetchImpl,
+      env: {},
+      now: () => NOW,
+    });
+
+    expect(() =>
+      client.importDesktopSessionFromCallbackUrl(
+        `https://www.electricsheephq.com/auth/callback?desktop_session=eds_callback_session_secret_for_test&desktop_session_expires_at=${encodeURIComponent(
+          FUTURE
+        )}`
+      )
+    ).toThrow(EvaosBrokerSessionError);
+    await expect(client.customerTargets()).rejects.toMatchObject({ code: 'missing_session' });
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it('loads runtime_status through the broker while returning only sanitized renderer metadata', async () => {
     const fetchImpl = fetchMock();
     fetchImpl

@@ -6,6 +6,7 @@
 
 import { ipcBridge } from '@/common';
 import type {
+  IEvaosBrokerBeginDesktopAuthResult,
   IEvaosBrokerClaimDeviceCodeRequest,
   IEvaosBrokerSessionStatus,
   IEvaosCustomerTargetsView,
@@ -17,6 +18,7 @@ import {
   getDefaultEvaosBrokerSessionClient,
   type EvaosBrokerSessionClient,
 } from '@process/services/evaosBrokerSession';
+import { beginEvaosDesktopAuth } from '@process/services/evaosDesktopAuth';
 import {
   evaosLocalProductFixtureCustomerTargets,
   isEvaosLocalProductFixtureEnabled,
@@ -32,6 +34,11 @@ interface BridgeResponse<D = {}> {
 }
 
 export function initEvaosBrokerBridge(client: EvaosBrokerSessionClient = getDefaultEvaosBrokerSessionClient()): void {
+  ipcBridge.evaosBroker.beginDesktopAuth.provider(
+    async (): Promise<BridgeResponse<IEvaosBrokerBeginDesktopAuthResult>> =>
+      toBridgeResponse(() => beginEvaosDesktopAuth(client))
+  );
+
   ipcBridge.evaosBroker.claimDeviceCode.provider(
     async ({ deviceCode }: IEvaosBrokerClaimDeviceCodeRequest): Promise<BridgeResponse<IEvaosBrokerSessionStatus>> =>
       toBridgeResponse(() => client.claimDeviceCode(deviceCode))

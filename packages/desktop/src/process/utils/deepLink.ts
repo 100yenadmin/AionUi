@@ -7,6 +7,7 @@
 import type { BrowserWindow } from 'electron';
 import { ipcBridge } from '@/common';
 import { EVAOS_BETA_IDENTITY, isEvaosBetaBuild } from '../evaosBetaSafety';
+import { getDefaultEvaosBrokerSessionClient } from '../services/evaosBrokerSession';
 
 export const PROTOCOL_SCHEME = isEvaosBetaBuild() ? EVAOS_BETA_IDENTITY.protocolScheme : 'aionui';
 
@@ -26,8 +27,12 @@ const RENDERER_SECRET_PARAM_NAMES = new Set([
   'password',
   'credential',
   'credentials',
+  'desktop_session',
   'grant',
+  'grant_handle',
   'jwt',
+  'provider_grant',
+  'provider_grant_handle',
   'session',
   'session_token',
 ]);
@@ -49,6 +54,23 @@ export const stripRendererSecretDeepLinkParams = (params: Record<string, string>
     safeParams[key] = value;
   }
   return safeParams;
+};
+
+type DesktopSessionImporter = (url: string) => boolean;
+
+const defaultDesktopSessionImporter: DesktopSessionImporter = (url: string): boolean => {
+  try {
+    getDefaultEvaosBrokerSessionClient().importDesktopSessionFromCallbackUrl(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+let desktopSessionImporter = defaultDesktopSessionImporter;
+
+export const setDeepLinkDesktopSessionImporterForTest = (importer: DesktopSessionImporter | null): void => {
+  desktopSessionImporter = importer ?? defaultDesktopSessionImporter;
 };
 
 /**
@@ -116,6 +138,10 @@ export const clearPendingDeepLinkPayload = (): void => {
  * If the window isn't ready yet, queue it.
  */
 export const handleDeepLinkUrl = (url: string): void => {
+  if (desktopSessionImporter(url)) {
+    return;
+  }
+
   const parsed = parseDeepLinkUrl(url);
   if (!parsed) return;
 
