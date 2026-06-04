@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
-import { Button, Input, Spin, Tag } from '@arco-design/web-react';
+import { Button, Spin, Tag } from '@arco-design/web-react';
 import { Attention, CloseOne, Refresh, Shield } from '@icon-park/react';
+import { useEvaosCustomerContext } from '@renderer/hooks/context/EvaosCustomerContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import {
   evaosApprovalCenter,
@@ -35,62 +36,117 @@ function riskColor(riskClass: IEvaosApprovalRequestView['riskClass']): 'red' | '
 const ApprovalCenterPage: React.FC = () => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
-  const [customerId, setCustomerId] = useState('');
   const [center, setCenter] = useState<IEvaosApprovalCenterView | null>(null);
   const [approvalError, setApprovalError] = useState<string | null>(null);
   const [loadingApprovals, setLoadingApprovals] = useState(false);
   const [decisionStatus, setDecisionStatus] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
+  const customerContext = useEvaosCustomerContext(true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const requestEpochRef = useRef(0);
 
-  const handleCustomerChange = useCallback((value: string) => {
-    setCustomerId(value);
+  const clearApprovalEvidence = useCallback(() => {
     setCenter(null);
     setApprovalError(null);
     setDecisionStatus(null);
     setDecisionError(null);
     setDecidingApprovalId(null);
+    setLoadingApprovals(false);
   }, []);
+
+  useEffect(() => {
+    selectedCustomerRef.current = customerContext.selectedCustomerId;
+    requestEpochRef.current += 1;
+    clearApprovalEvidence();
+  }, [clearApprovalEvidence, customerContext.selectedCustomerId]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
+  }, []);
+
+  const isSelectedCustomer = useCallback((customerId: string) => {
+    return selectedCustomerRef.current === customerId;
+  }, []);
+
+  const selectCustomer = useCallback(
+    (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
+      customerContext.selectCustomer(customerId);
+      clearApprovalEvidence();
+    },
+    [clearApprovalEvidence, customerContext]
+  );
+
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    selectedCustomerRef.current = undefined;
+    clearApprovalEvidence();
+    await customerContext.refreshTargets();
+  }, [clearApprovalEvidence, customerContext]);
 
   const loadApprovals = useCallback(
     async (options: { resetDecisionStatus?: boolean } = {}) => {
-      const trimmedCustomerId = customerId.trim();
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       if (options.resetDecisionStatus !== false) {
         setDecisionStatus(null);
         setDecisionError(null);
       }
-      if (!trimmedCustomerId) {
+      if (!selectedCustomerId) {
         setCenter(null);
         setApprovalError('Choose a customer before loading approvals.');
         return;
       }
 
+      const requestEpoch = requestEpochRef.current + 1;
+      requestEpochRef.current = requestEpoch;
+      selectedCustomerRef.current = selectedCustomerId;
       setLoadingApprovals(true);
       setApprovalError(null);
       try {
-        const response = await evaosApprovalCenter.getApprovals.invoke({ customerId: trimmedCustomerId, limit: 50 });
+        const response = await evaosApprovalCenter.getApprovals.invoke({ customerId: selectedCustomerId, limit: 50 });
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setCenter(null);
           setApprovalError(safeUiText(response.msg, 'Approval Center failed closed.'));
           return;
         }
+        if (response.data.customerId !== selectedCustomerId) {
+          setCenter(null);
+          setApprovalError('Approval Center broker returned evidence for a different customer.');
+          return;
+        }
         setCenter(response.data);
       } catch {
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         setCenter(null);
         setApprovalError('Approval Center broker request failed closed.');
       } finally {
-        setLoadingApprovals(false);
+        if (isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          setLoadingApprovals(false);
+        }
       }
     },
-    [customerId]
+    [customerContext.selectedCustomerId, isCurrentRequest]
   );
 
   const denyApproval = useCallback(
     async (approval: IEvaosApprovalRequestView) => {
-      const trimmedCustomerId = customerId.trim();
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       setDecisionStatus(null);
       setDecisionError(null);
-      if (!center || center.routeDenied || !approval.canDeny) {
+      if (
+        !center ||
+        center.routeDenied ||
+        !approval.canDeny ||
+        !selectedCustomerId ||
+        center.customerId !== selectedCustomerId
+      ) {
         setDecisionError('Action denied by account policy.');
         return;
       }
@@ -98,24 +154,36 @@ const ApprovalCenterPage: React.FC = () => {
       setDecidingApprovalId(approval.approvalId);
       try {
         const response = await evaosApprovalCenter.denyApproval.invoke({
-          customerId: trimmedCustomerId,
+          customerId: selectedCustomerId,
           approvalId: approval.approvalId,
           reason: 'Denied from AionUi public beta Approval Center.',
         });
+        if (!isSelectedCustomer(selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setDecisionError(safeUiText(response.msg, 'Backend denied the approval decision.'));
           return;
         }
         await loadApprovals({ resetDecisionStatus: false });
+        if (!isSelectedCustomer(selectedCustomerId)) {
+          return;
+        }
         setDecisionStatus(decisionSummary(response.data));
       } catch {
+        if (!isSelectedCustomer(selectedCustomerId)) {
+          return;
+        }
         setDecisionError('Backend denied the approval decision.');
       } finally {
         setDecidingApprovalId(null);
       }
     },
-    [center, customerId, loadApprovals]
+    [center, customerContext.selectedCustomerId, isSelectedCustomer, loadApprovals]
   );
+
+  const selectedCustomerLabel =
+    customerContext.selectedTarget?.displayName ?? customerContext.selectedCustomerId ?? 'No customer selected';
 
   return (
     <div
@@ -136,6 +204,7 @@ const ApprovalCenterPage: React.FC = () => {
             type='primary'
             icon={<Refresh theme='outline' size='16' />}
             loading={loadingApprovals}
+            disabled={!customerContext.selectedCustomerId}
             onClick={() => void loadApprovals()}
           >
             Refresh
@@ -143,21 +212,48 @@ const ApprovalCenterPage: React.FC = () => {
         </header>
 
         <section className='rounded-8px border border-solid border-[var(--color-border-2)] bg-fill-1 p-14px'>
-          <label className='block text-13px font-medium leading-20px text-t-primary' htmlFor='approval-customer-id'>
-            Customer context
-          </label>
-          <div className='mt-8px flex gap-8px max-[520px]:flex-col'>
-            <Input
-              id='approval-customer-id'
-              value={customerId}
-              placeholder='Customer ID or slug'
-              onChange={handleCustomerChange}
-              onPressEnter={() => void loadApprovals()}
-            />
-            <Button className='shrink-0' loading={loadingApprovals} onClick={() => void loadApprovals()}>
-              Load
-            </Button>
+          <div className='flex flex-wrap items-center justify-between gap-10px'>
+            <div className='min-w-0'>
+              <div className='text-13px font-medium leading-20px text-t-primary'>Customer context</div>
+              <div className='mt-2px truncate text-12px leading-18px text-t-secondary'>
+                {customerContext.loading ? 'Loading customer targets...' : selectedCustomerLabel}
+              </div>
+            </div>
+            <div className='flex shrink-0 flex-wrap gap-8px'>
+              <Button loading={customerContext.loading} onClick={() => void refreshCustomerTargets()}>
+                Refresh targets
+              </Button>
+              <Button
+                className='shrink-0'
+                loading={loadingApprovals || customerContext.loading}
+                disabled={!customerContext.selectedCustomerId}
+                onClick={() => void loadApprovals()}
+              >
+                Load
+              </Button>
+            </div>
           </div>
+          <div className='mt-10px flex flex-wrap gap-8px'>
+            {customerContext.targets.length === 0 ? (
+              <Tag color={customerContext.error ? 'orange' : 'gray'}>
+                {customerContext.error ?? customerContext.summaryText}
+              </Tag>
+            ) : (
+              customerContext.targets.map((target) => (
+                <Button
+                  key={target.customerId}
+                  size='small'
+                  type={target.customerId === customerContext.selectedCustomerId ? 'primary' : 'secondary'}
+                  onClick={() => selectCustomer(target.customerId)}
+                >
+                  {target.displayName}
+                </Button>
+              ))
+            )}
+          </div>
+          <p className='m-0 mt-8px text-12px leading-18px text-t-secondary'>
+            {customerContext.summaryText}. Approval Center stays scoped to the selected customer.
+          </p>
           {approvalError ? (
             <p className='m-0 mt-8px text-12px leading-18px text-[rgb(var(--warning-6))]'>{approvalError}</p>
           ) : null}

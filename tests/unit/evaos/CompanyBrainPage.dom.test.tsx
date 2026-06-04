@@ -6,9 +6,14 @@
 
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { clearEvaosCustomerContext } from '@/renderer/hooks/context/EvaosCustomerContext';
 import CompanyBrainPage from '@/renderer/pages/company-brain';
+
+const brokerMocks = vi.hoisted(() => ({
+  getCustomerTargets: vi.fn(),
+}));
 
 const companyBrainMocks = vi.hoisted(() => ({
   getDirectory: vi.fn(),
@@ -21,6 +26,11 @@ vi.mock('@renderer/hooks/context/LayoutContext', () => ({
 }));
 
 vi.mock('@/common/adapter/ipcBridge', () => ({
+  evaosBroker: {
+    getCustomerTargets: {
+      invoke: brokerMocks.getCustomerTargets,
+    },
+  },
   evaosCompanyBrain: {
     getDirectory: {
       invoke: companyBrainMocks.getDirectory,
@@ -83,6 +93,43 @@ function directory(
   };
 }
 
+function customerTargets() {
+  return {
+    success: true,
+    data: {
+      roles: ['admin'],
+      isOperator: true,
+      defaultCustomerId: 'david-poku',
+      selectedCustomerId: 'david-poku',
+      customers: [
+        {
+          customerId: 'david-poku',
+          displayName: 'David Poku Co',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: true,
+        },
+        {
+          customerId: 'second-customer',
+          displayName: 'Second Customer',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: false,
+        },
+      ],
+      summaryText: '2 customer targets loaded',
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 function account360(accountId = 'account_acme') {
   return {
     schemaVersion: 'evaos.company_brain.account_360.v1',
@@ -138,6 +185,9 @@ function account360(accountId = 'account_acme') {
 
 describe('CompanyBrainPage', () => {
   beforeEach(() => {
+    clearEvaosCustomerContext();
+    brokerMocks.getCustomerTargets.mockReset();
+    brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
     companyBrainMocks.getDirectory.mockReset();
     companyBrainMocks.getAccount360.mockReset();
     companyBrainMocks.query.mockReset();
@@ -179,7 +229,7 @@ describe('CompanyBrainPage', () => {
 
     const { container } = render(<CompanyBrainPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('Acme Co')).toBeInTheDocument();
@@ -216,7 +266,7 @@ describe('CompanyBrainPage', () => {
 
     render(<CompanyBrainPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('Route denied')).toBeInTheDocument();
@@ -245,16 +295,14 @@ describe('CompanyBrainPage', () => {
 
     render(<CompanyBrainPage />);
 
-    const customerInput = screen.getByLabelText('Customer context');
-    await user.type(customerInput, 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('Acme Co')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^view$/i }));
     expect(await screen.findByText('Renewal account')).toBeInTheDocument();
 
-    await user.clear(customerInput);
-    await user.type(customerInput, 'second-customer');
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
 
     expect(screen.queryByText('Renewal account')).not.toBeInTheDocument();
     expect(screen.queryByText('Acme Co')).not.toBeInTheDocument();
@@ -262,6 +310,349 @@ describe('CompanyBrainPage', () => {
 
     await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('Second Co')).toBeInTheDocument();
+  });
+
+  it('uses the selected non-default customer for directory, account, and query loads', async () => {
+    const user = userEvent.setup();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: directory({ customerId: 'second-customer', accountId: 'account_second', accountName: 'Second Co' }),
+    });
+    companyBrainMocks.getAccount360.mockResolvedValue({
+      success: true,
+      data: {
+        ...account360('account_second'),
+        customerId: 'second-customer',
+        account: {
+          accountId: 'account_second',
+          name: 'Second Co',
+          domain: 'second.example',
+          ingestionState: 'ready',
+          exceptionCount: 0,
+        },
+      },
+    });
+    companyBrainMocks.query.mockResolvedValue({
+      success: true,
+      data: {
+        schemaVersion: 'evaos.company_brain.query.v1',
+        customerId: 'second-customer',
+        customerAccountId: 'acct_123',
+        accountId: 'account_second',
+        status: 'answered',
+        answer: 'Second Co is ready for rollout.',
+        citations: [],
+        sourcePointer: 'broker:company_brain_query:account_second',
+        auditId: 'audit_query_second',
+        backendEnforced: true,
+      },
+    });
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(await screen.findByText('Second Co')).toBeInTheDocument();
+    expect(companyBrainMocks.getDirectory).toHaveBeenCalledWith({ customerId: 'second-customer' });
+
+    await user.click(screen.getByRole('button', { name: /^view$/i }));
+    expect(await screen.findAllByText('Second Co')).toHaveLength(2);
+    expect(companyBrainMocks.getAccount360).toHaveBeenCalledWith({
+      customerId: 'second-customer',
+      accountId: 'account_second',
+    });
+
+    await user.type(screen.getByLabelText('Ask Company Brain'), 'Is rollout ready?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await waitFor(() => {
+      expect(companyBrainMocks.query).toHaveBeenCalledWith({
+        customerId: 'second-customer',
+        accountId: 'account_second',
+        query: 'Is rollout ready?',
+      });
+    });
+    expect(await screen.findByText('Second Co is ready for rollout.')).toBeInTheDocument();
+  });
+
+  it('does not render stale Company Brain evidence when the selected customer changes before the broker responds', async () => {
+    const user = userEvent.setup();
+    const pendingDirectory = deferred<{
+      success: boolean;
+      data: ReturnType<typeof directory>;
+    }>();
+    companyBrainMocks.getDirectory.mockReturnValueOnce(pendingDirectory.promise);
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(companyBrainMocks.getDirectory).toHaveBeenCalledWith({ customerId: 'david-poku' });
+
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+
+    await act(async () => {
+      pendingDirectory.resolve({
+        success: true,
+        data: directory({ customerId: 'david-poku', accountId: 'account_acme', accountName: 'Acme Co' }),
+      });
+      await pendingDirectory.promise;
+    });
+
+    expect(screen.queryByText('Acme Co')).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit_directory_123/)).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account to view Company Brain evidence.')).toBeInTheDocument();
+  });
+
+  it('fails closed when directory evidence is returned for a different customer', async () => {
+    const user = userEvent.setup();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: directory({ customerId: 'wrong-customer', accountId: 'account_wrong', accountName: 'Wrong Co' }),
+    });
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(
+      await screen.findByText('Company Brain broker returned evidence for a different customer.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Wrong Co')).not.toBeInTheDocument();
+    expect(companyBrainMocks.getAccount360).not.toHaveBeenCalled();
+    expect(companyBrainMocks.query).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when account 360 evidence does not match the selected customer and account', async () => {
+    const user = userEvent.setup();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: directory({ accountId: 'account_acme', accountName: 'Acme Co' }),
+    });
+    companyBrainMocks.getAccount360.mockResolvedValue({
+      success: true,
+      data: {
+        ...account360('account_wrong'),
+        customerId: 'wrong-customer',
+        accountId: 'account_wrong',
+      },
+    });
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('Acme Co')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^view$/i }));
+
+    expect(
+      await screen.findByText('Company Brain broker returned account evidence for the wrong customer or account.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Renewal account')).not.toBeInTheDocument();
+  });
+
+  it('keeps newer account evidence when an older same-customer account request resolves last', async () => {
+    const user = userEvent.setup();
+    const firstAccount = deferred<{
+      success: boolean;
+      data: ReturnType<typeof account360>;
+    }>();
+    const secondAccount = deferred<{
+      success: boolean;
+      data: ReturnType<typeof account360>;
+    }>();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: {
+        ...directory(),
+        accounts: [
+          {
+            accountId: 'account_acme',
+            name: 'Acme Co',
+            domain: 'acme.example',
+            owner: 'sales',
+            ingestionState: 'ready',
+            exceptionCount: 2,
+          },
+          {
+            accountId: 'account_second',
+            name: 'Second Co',
+            domain: 'second.example',
+            owner: 'sales',
+            ingestionState: 'ready',
+            exceptionCount: 0,
+          },
+        ],
+      },
+    });
+    companyBrainMocks.getAccount360
+      .mockReturnValueOnce(firstAccount.promise)
+      .mockReturnValueOnce(secondAccount.promise);
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('Acme Co')).toBeInTheDocument();
+
+    const viewButtons = screen.getAllByRole('button', { name: /^view$/i });
+    await user.click(viewButtons[0]);
+    await user.click(viewButtons[1]);
+
+    await act(async () => {
+      secondAccount.resolve({
+        success: true,
+        data: {
+          ...account360('account_second'),
+          account: {
+            accountId: 'account_second',
+            name: 'Second Co',
+            domain: 'second.example',
+            ingestionState: 'ready',
+            exceptionCount: 0,
+          },
+          brief: {
+            title: 'Second account brief',
+            summary: 'Second account should remain selected when the older request resolves last.',
+            updatedAt: '2026-06-03T11:45:00.000Z',
+            sourcePointer: 'broker:company_brain_brief:account_second',
+            auditId: 'audit_second_brief_123',
+          },
+        },
+      });
+      await secondAccount.promise;
+    });
+    expect(await screen.findAllByText('Second Co')).toHaveLength(2);
+
+    await act(async () => {
+      firstAccount.resolve({
+        success: true,
+        data: account360('account_acme'),
+      });
+      await firstAccount.promise;
+    });
+
+    expect(screen.queryByText('Renewal account')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Second Co')).toHaveLength(2);
+  });
+
+  it('keeps newer query evidence when an older same-account query resolves last', async () => {
+    const user = userEvent.setup();
+    const firstQuery = deferred<{
+      success: boolean;
+      data: Record<string, unknown>;
+    }>();
+    const secondQuery = deferred<{
+      success: boolean;
+      data: Record<string, unknown>;
+    }>();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: directory(),
+    });
+    companyBrainMocks.getAccount360.mockResolvedValue({
+      success: true,
+      data: account360(),
+    });
+    companyBrainMocks.query.mockReturnValueOnce(firstQuery.promise).mockReturnValueOnce(secondQuery.promise);
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('Acme Co')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^view$/i }));
+    expect(await screen.findByText('Renewal account')).toBeInTheDocument();
+
+    const queryInput = screen.getByLabelText('Ask Company Brain');
+    await user.type(queryInput, 'First question');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+    await user.clear(queryInput);
+    await user.type(queryInput, 'Second question');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    await act(async () => {
+      secondQuery.resolve({
+        success: true,
+        data: {
+          schemaVersion: 'evaos.company_brain.query.v1',
+          customerId: 'david-poku',
+          customerAccountId: 'acct_123',
+          accountId: 'account_acme',
+          status: 'answered',
+          answer: 'Second answer wins.',
+          citations: [],
+          backendEnforced: true,
+        },
+      });
+      await secondQuery.promise;
+    });
+    expect(await screen.findByText('Second answer wins.')).toBeInTheDocument();
+
+    await act(async () => {
+      firstQuery.resolve({
+        success: true,
+        data: {
+          schemaVersion: 'evaos.company_brain.query.v1',
+          customerId: 'david-poku',
+          customerAccountId: 'acct_123',
+          accountId: 'account_acme',
+          status: 'answered',
+          answer: 'Stale first answer.',
+          citations: [],
+          backendEnforced: true,
+        },
+      });
+      await firstQuery.promise;
+    });
+
+    expect(screen.queryByText('Stale first answer.')).not.toBeInTheDocument();
+    expect(screen.getByText('Second answer wins.')).toBeInTheDocument();
+  });
+
+  it('fails closed when query evidence does not match the selected customer and account', async () => {
+    const user = userEvent.setup();
+    companyBrainMocks.getDirectory.mockResolvedValue({
+      success: true,
+      data: directory(),
+    });
+    companyBrainMocks.getAccount360.mockResolvedValue({
+      success: true,
+      data: account360(),
+    });
+    companyBrainMocks.query.mockResolvedValue({
+      success: true,
+      data: {
+        schemaVersion: 'evaos.company_brain.query.v1',
+        customerId: 'wrong-customer',
+        customerAccountId: 'acct_123',
+        accountId: 'account_wrong',
+        status: 'answered',
+        answer: 'Wrong customer answer.',
+        citations: [],
+        backendEnforced: true,
+      },
+    });
+
+    render(<CompanyBrainPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('Acme Co')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /^view$/i }));
+    expect(await screen.findByText('Renewal account')).toBeInTheDocument();
+
+    await user.type(screen.getByLabelText('Ask Company Brain'), 'Is this scoped?');
+    await user.click(screen.getByRole('button', { name: /^ask$/i }));
+
+    expect(
+      await screen.findByText('Company Brain broker returned query evidence for the wrong customer or account.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Wrong customer answer.')).not.toBeInTheDocument();
   });
 
   it('renders backend denial without leaking broker secret text', async () => {
@@ -277,7 +668,7 @@ describe('CompanyBrainPage', () => {
 
     const { container } = render(<CompanyBrainPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
     await screen.findByText('Acme Co');
 

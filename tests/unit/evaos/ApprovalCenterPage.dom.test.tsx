@@ -6,9 +6,14 @@
 
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { clearEvaosCustomerContext } from '@/renderer/hooks/context/EvaosCustomerContext';
 import ApprovalCenterPage from '@/renderer/pages/approval-center';
+
+const brokerMocks = vi.hoisted(() => ({
+  getCustomerTargets: vi.fn(),
+}));
 
 const approvalCenterMocks = vi.hoisted(() => ({
   getApprovals: vi.fn(),
@@ -20,6 +25,11 @@ vi.mock('@renderer/hooks/context/LayoutContext', () => ({
 }));
 
 vi.mock('@/common/adapter/ipcBridge', () => ({
+  evaosBroker: {
+    getCustomerTargets: {
+      invoke: brokerMocks.getCustomerTargets,
+    },
+  },
   evaosApprovalCenter: {
     getApprovals: {
       invoke: approvalCenterMocks.getApprovals,
@@ -84,8 +94,48 @@ function approvalCenter(routeDenied = false) {
   };
 }
 
+function customerTargets() {
+  return {
+    success: true,
+    data: {
+      roles: ['admin'],
+      isOperator: true,
+      defaultCustomerId: 'david-poku',
+      selectedCustomerId: 'david-poku',
+      customers: [
+        {
+          customerId: 'david-poku',
+          displayName: 'David Poku Co',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: true,
+        },
+        {
+          customerId: 'second-customer',
+          displayName: 'Second Customer',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: false,
+        },
+      ],
+      summaryText: '2 customer targets loaded',
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 describe('ApprovalCenterPage', () => {
   beforeEach(() => {
+    clearEvaosCustomerContext();
+    brokerMocks.getCustomerTargets.mockReset();
+    brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
     approvalCenterMocks.getApprovals.mockReset();
     approvalCenterMocks.denyApproval.mockReset();
   });
@@ -124,7 +174,7 @@ describe('ApprovalCenterPage', () => {
 
     const { container } = render(<ApprovalCenterPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('attacker@example.net')).toBeInTheDocument();
@@ -153,7 +203,7 @@ describe('ApprovalCenterPage', () => {
 
     render(<ApprovalCenterPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('Route denied')).toBeInTheDocument();
@@ -181,7 +231,7 @@ describe('ApprovalCenterPage', () => {
 
     render(<ApprovalCenterPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('Route denied')).toBeInTheDocument();
@@ -202,19 +252,125 @@ describe('ApprovalCenterPage', () => {
 
     render(<ApprovalCenterPage />);
 
-    const customerInput = screen.getByLabelText('Customer context');
-    await user.type(customerInput, 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('attacker@example.net')).toBeInTheDocument();
     expect(screen.getByText(/audit_request_123/)).toBeInTheDocument();
 
-    await user.clear(customerInput);
-    await user.type(customerInput, 'second-customer');
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
 
     expect(screen.queryByText('attacker@example.net')).not.toBeInTheDocument();
     expect(screen.queryByText(/audit_request_123/)).not.toBeInTheDocument();
     expect(screen.getByText('Load a customer account to review pending approval requests.')).toBeInTheDocument();
+  });
+
+  it('uses the selected non-default customer for approval loads and deny decisions', async () => {
+    const user = userEvent.setup();
+    approvalCenterMocks.getApprovals
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...approvalCenter(false),
+          customerId: 'second-customer',
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          ...approvalCenter(false),
+          customerId: 'second-customer',
+          requests: [],
+          summaryText: 'No pending approvals',
+        },
+      });
+    approvalCenterMocks.denyApproval.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'denied',
+        decision: 'deny',
+        scope: 'this-call',
+        approvalId: 'approval-email-1',
+        runtimeResult: {
+          status: 'denied',
+          runtime: 'openclaw',
+          sourcePointer: 'approval-result:approval-email-1',
+          auditId: 'audit_result_123',
+        },
+        backendEnforced: true,
+      },
+    });
+
+    render(<ApprovalCenterPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(await screen.findByText('attacker@example.net')).toBeInTheDocument();
+    expect(approvalCenterMocks.getApprovals).toHaveBeenCalledWith({ customerId: 'second-customer', limit: 50 });
+
+    await user.click(screen.getByRole('button', { name: /^deny$/i }));
+
+    await waitFor(() => {
+      expect(approvalCenterMocks.denyApproval).toHaveBeenCalledWith({
+        customerId: 'second-customer',
+        approvalId: 'approval-email-1',
+        reason: 'Denied from AionUi public beta Approval Center.',
+      });
+    });
+  });
+
+  it('does not render stale approval evidence when the selected customer changes before the broker responds', async () => {
+    const user = userEvent.setup();
+    const pendingApprovals = deferred<{
+      success: boolean;
+      data: ReturnType<typeof approvalCenter>;
+    }>();
+    approvalCenterMocks.getApprovals.mockReturnValueOnce(pendingApprovals.promise);
+
+    render(<ApprovalCenterPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(approvalCenterMocks.getApprovals).toHaveBeenCalledWith({ customerId: 'david-poku', limit: 50 });
+
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+
+    await act(async () => {
+      pendingApprovals.resolve({
+        success: true,
+        data: approvalCenter(false),
+      });
+      await pendingApprovals.promise;
+    });
+
+    expect(screen.queryByText('attacker@example.net')).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit_request_123/)).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account to review pending approval requests.')).toBeInTheDocument();
+  });
+
+  it('fails closed when approval evidence is returned for a different customer', async () => {
+    const user = userEvent.setup();
+    approvalCenterMocks.getApprovals.mockResolvedValue({
+      success: true,
+      data: {
+        ...approvalCenter(false),
+        customerId: 'wrong-customer',
+      },
+    });
+
+    render(<ApprovalCenterPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(
+      await screen.findByText('Approval Center broker returned evidence for a different customer.')
+    ).toBeInTheDocument();
+    expect(screen.queryByText('attacker@example.net')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^deny$/i })).not.toBeInTheDocument();
+    expect(approvalCenterMocks.denyApproval).not.toHaveBeenCalled();
   });
 
   it('renders backend denial without leaking broker secret text', async () => {
@@ -230,7 +386,7 @@ describe('ApprovalCenterPage', () => {
 
     const { container } = render(<ApprovalCenterPage />);
 
-    await user.type(screen.getByLabelText('Customer context'), 'david-poku');
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
     await user.click(screen.getByRole('button', { name: /^load$/i }));
     await screen.findByText('attacker@example.net');
 

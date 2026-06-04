@@ -53,6 +53,27 @@ function safeUiText(value: unknown, fallback: string): string {
   return trimmed.length > 220 ? `${trimmed.slice(0, 217)}...` : trimmed;
 }
 
+function safeOptionalUiText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const trimmed = value.trim();
+  if (!trimmed || SECRET_TEXT_PATTERN.test(trimmed)) return undefined;
+  return trimmed.length > 220 ? `${trimmed.slice(0, 217)}...` : trimmed;
+}
+
+function customerTargetsSummary(count: number): string {
+  return count === 1 ? '1 customer target loaded' : `${count} customer targets loaded`;
+}
+
+function safeCustomerTarget(target: IEvaosCustomerTargetView): IEvaosCustomerTargetView {
+  return {
+    ...target,
+    displayName: safeUiText(target.displayName, safeOptionalUiText(target.customerId) ?? 'Customer target'),
+    email: safeOptionalUiText(target.email),
+    status: safeOptionalUiText(target.status),
+    healthStatus: safeOptionalUiText(target.healthStatus),
+  };
+}
+
 function chooseSelectedCustomer(view: IEvaosCustomerTargetsView): string | undefined {
   return (
     view.customers.find((target) => target.customerId === view.selectedCustomerId)?.customerId ??
@@ -101,10 +122,17 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
     if (epoch !== requestEpoch) {
       return;
     }
+    const customers = response.data.customers.map(safeCustomerTarget);
+    const sanitizedView = {
+      ...response.data,
+      customers,
+      summaryText: safeUiText(response.data.summaryText, customerTargetsSummary(customers.length)),
+    };
+
     emit({
-      targets: response.data.customers,
-      selectedCustomerId: chooseSelectedCustomer(response.data),
-      summaryText: response.data.summaryText,
+      targets: sanitizedView.customers,
+      selectedCustomerId: chooseSelectedCustomer(sanitizedView),
+      summaryText: sanitizedView.summaryText,
       loading: false,
       error: undefined,
     });
