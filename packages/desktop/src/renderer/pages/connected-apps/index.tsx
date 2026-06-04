@@ -199,20 +199,19 @@ const ConnectedAppsPage: React.FC = () => {
 
       setActionTarget(`${providerKey}:${action}`);
       try {
-        const request =
+        const response =
           action === 'requestApproval'
-            ? ({
+            ? await evaosProviderHub.requestApproval.invoke({
                 customerId: selectedCustomerId,
                 providerKey,
                 requestedAction: 'provider_mint_grant',
                 agentRuntime,
               } satisfies IEvaosProviderApprovalRequest)
-            : ({
+            : await evaosProviderHub[action].invoke({
                 customerId: selectedCustomerId,
                 providerKey,
                 agentRuntime: action === 'mintGrant' ? agentRuntime : undefined,
               } satisfies IEvaosProviderActionRequest);
-        const response = await evaosProviderHub[action].invoke(request);
         if (!isSelectedCustomer(selectedCustomerId)) {
           return;
         }
