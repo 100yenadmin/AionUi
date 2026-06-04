@@ -197,6 +197,56 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
     ],
     forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
   },
+  {
+    name: 'company-brain-loaded-fixture',
+    hash: '/company-brain',
+    title: 'Company Brain',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Company Brain',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Northstar Fixture Account',
+      'Renewal fixture brief',
+      'local-fixture:company-brain:query:fixture-company-renewal',
+      'fixture-audit-company-directory',
+    ],
+    loadedStateRequiredMarkers: [
+      'account directory rows',
+      'account 360 panel',
+      'query answer source pointer',
+      'directory source pointer',
+    ],
+    action: 'click-load-company-brain',
+    isolateRendererState: true,
+    expected: [
+      'Company Brain',
+      'Org-scoped account directory, account brief, timeline, query, and exception evidence.',
+      'Acme Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Northstar Fixture Account',
+      'Atlas Fixture Account',
+      'Signal Error Fixture Account',
+      'Source local-fixture:company-brain:directory',
+      'Renewal fixture brief',
+      'Fixture kickoff call',
+      'Synthetic ingest still running',
+      'Source local-fixture:company-brain:account-360:fixture-company-renewal',
+      'Brief source local-fixture:company-brain:brief:fixture-company-renewal',
+      'Source local-fixture:company-brain:query:fixture-company-renewal',
+      'fixture-audit-company-directory',
+      'fixture-audit-policy',
+    ],
+    forbidden: [
+      'desktop_session',
+      'Bearer',
+      'provider_grant',
+      'grant_handle',
+      'access_token',
+      'refresh_token',
+      'raw_embedding',
+      'raw_prompt',
+    ],
+  },
 ];
 
 const TEAM_ROUTE_CHECK = {
@@ -337,6 +387,26 @@ async function clickRefreshTargets(page) {
   const refreshTargetsButton = page.getByRole('button', { name: /^Refresh targets$/ }).first();
   await refreshTargetsButton.click();
   await page.waitForTimeout(350);
+}
+
+async function clickFirstCompanyBrainAccount(page) {
+  const viewButton = page.getByRole('button', { name: /^View$/ }).first();
+  await viewButton.waitFor({ state: 'visible', timeout: 10000 });
+  await viewButton.click();
+  await page.waitForFunction(() => document.body.innerText.includes('Renewal fixture brief'), { timeout: 10000 });
+}
+
+async function askCompanyBrainFixtureQuestion(page) {
+  const queryInput = page.getByLabel('Ask Company Brain');
+  await queryInput.fill('What needs attention?');
+  await page.getByRole('button', { name: /^Ask$/ }).click();
+  await page.waitForFunction(
+    () => document.body.innerText.includes('local-fixture:company-brain:query:fixture-company-renewal'),
+    { timeout: 10000 }
+  );
+  await page
+    .getByText('Source local-fixture:company-brain:query:fixture-company-renewal')
+    .scrollIntoViewIfNeeded({ timeout: 10000 });
 }
 
 async function bodyText(page, timeout = 1500) {
@@ -505,6 +575,10 @@ async function runLocalShellSmoke(options = {}) {
       }
       if (check.action === 'click-load') {
         await clickLoad(page);
+      } else if (check.action === 'click-load-company-brain') {
+        await clickLoad(page);
+        await clickFirstCompanyBrainAccount(page);
+        await askCompanyBrainFixtureQuestion(page);
       } else if (check.action === 'click-refresh-targets') {
         await clickRefreshTargets(page);
       }
