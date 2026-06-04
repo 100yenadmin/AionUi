@@ -80,6 +80,15 @@ const ConnectedAppsPage: React.FC = () => {
     [hub?.profiles]
   );
 
+  const handleCustomerChange = useCallback((value: string) => {
+    setCustomerId(value);
+    setHub(null);
+    setHubError(null);
+    setActionStatus(null);
+    setActionError(null);
+    setActionTarget(null);
+  }, []);
+
   const loadHub = useCallback(
     async (options: { resetActionStatus?: boolean } = {}) => {
       const trimmedCustomerId = customerId.trim();
@@ -194,7 +203,7 @@ const ConnectedAppsPage: React.FC = () => {
               id='providers-customer-id'
               value={customerId}
               placeholder='Customer ID or slug'
-              onChange={setCustomerId}
+              onChange={handleCustomerChange}
               onPressEnter={() => void loadHub()}
             />
             <Button className='shrink-0' loading={loadingHub} onClick={() => void loadHub()}>

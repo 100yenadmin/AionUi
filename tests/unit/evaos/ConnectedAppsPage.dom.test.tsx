@@ -255,6 +255,30 @@ describe('ConnectedAppsPage', () => {
     expect(providerHubMocks.mintGrant).not.toHaveBeenCalled();
   });
 
+  it('clears provider evidence when customer context changes before loading the next customer', async () => {
+    const user = userEvent.setup();
+    providerHubMocks.getProfiles.mockResolvedValue({
+      success: true,
+      data: providerHub(false),
+    });
+
+    render(<ConnectedAppsPage />);
+
+    const customerInput = screen.getByLabelText('Customer context');
+    await user.type(customerInput, 'david-poku');
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(await screen.findByText('Google Workspace')).toBeInTheDocument();
+    expect(screen.getByText('sales@example.test')).toBeInTheDocument();
+
+    await user.clear(customerInput);
+    await user.type(customerInput, 'second-customer');
+
+    expect(screen.queryByText('Google Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('sales@example.test')).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account to view connected app evidence.')).toBeInTheDocument();
+  });
+
   it('renders backend denial without leaking broker secret text', async () => {
     const user = userEvent.setup();
     providerHubMocks.getProfiles.mockResolvedValue({

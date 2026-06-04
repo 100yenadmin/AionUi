@@ -43,6 +43,15 @@ const ApprovalCenterPage: React.FC = () => {
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decidingApprovalId, setDecidingApprovalId] = useState<string | null>(null);
 
+  const handleCustomerChange = useCallback((value: string) => {
+    setCustomerId(value);
+    setCenter(null);
+    setApprovalError(null);
+    setDecisionStatus(null);
+    setDecisionError(null);
+    setDecidingApprovalId(null);
+  }, []);
+
   const loadApprovals = useCallback(
     async (options: { resetDecisionStatus?: boolean } = {}) => {
       const trimmedCustomerId = customerId.trim();
@@ -142,7 +151,7 @@ const ApprovalCenterPage: React.FC = () => {
               id='approval-customer-id'
               value={customerId}
               placeholder='Customer ID or slug'
-              onChange={setCustomerId}
+              onChange={handleCustomerChange}
               onPressEnter={() => void loadApprovals()}
             />
             <Button className='shrink-0' loading={loadingApprovals} onClick={() => void loadApprovals()}>

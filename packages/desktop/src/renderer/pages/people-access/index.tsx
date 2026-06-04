@@ -63,6 +63,14 @@ const PeopleAccessPage: React.FC = () => {
     return Object.entries(policy?.advancedSurfaces ?? {}).toSorted(([left], [right]) => left.localeCompare(right));
   }, [policy?.advancedSurfaces]);
 
+  const handleCustomerChange = useCallback((value: string) => {
+    setCustomerId(value);
+    setPolicy(null);
+    setPolicyError(null);
+    setInviteStatus(null);
+    setInviteError(null);
+  }, []);
+
   const loadPolicy = useCallback(
     async (options: { resetInviteStatus?: boolean } = {}) => {
       const trimmedCustomerId = customerId.trim();
@@ -159,7 +167,7 @@ const PeopleAccessPage: React.FC = () => {
               id='people-customer-id'
               value={customerId}
               placeholder='Customer ID or slug'
-              onChange={setCustomerId}
+              onChange={handleCustomerChange}
               onPressEnter={() => void loadPolicy()}
             />
             <Button className='shrink-0' loading={loadingPolicy} onClick={() => void loadPolicy()}>

@@ -163,6 +163,30 @@ describe('ApprovalCenterPage', () => {
     expect(approvalCenterMocks.denyApproval).not.toHaveBeenCalled();
   });
 
+  it('clears approval evidence when customer context changes before loading the next customer', async () => {
+    const user = userEvent.setup();
+    approvalCenterMocks.getApprovals.mockResolvedValue({
+      success: true,
+      data: approvalCenter(false),
+    });
+
+    render(<ApprovalCenterPage />);
+
+    const customerInput = screen.getByLabelText('Customer context');
+    await user.type(customerInput, 'david-poku');
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(await screen.findByText('attacker@example.net')).toBeInTheDocument();
+    expect(screen.getByText(/audit_request_123/)).toBeInTheDocument();
+
+    await user.clear(customerInput);
+    await user.type(customerInput, 'second-customer');
+
+    expect(screen.queryByText('attacker@example.net')).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit_request_123/)).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account to review pending approval requests.')).toBeInTheDocument();
+  });
+
   it('renders backend denial without leaking broker secret text', async () => {
     const user = userEvent.setup();
     approvalCenterMocks.getApprovals.mockResolvedValue({

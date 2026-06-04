@@ -134,6 +134,30 @@ describe('PeopleAccessPage', () => {
     expect(peopleAccessMocks.inviteMember).not.toHaveBeenCalled();
   });
 
+  it('clears policy evidence when customer context changes before loading the next customer', async () => {
+    const user = userEvent.setup();
+    peopleAccessMocks.getPolicy.mockResolvedValue({
+      success: true,
+      data: policy(['manage_members']),
+    });
+
+    render(<PeopleAccessPage />);
+
+    const customerInput = screen.getByLabelText('Customer context');
+    await user.type(customerInput, 'david-poku');
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect((await screen.findAllByText('owner@example.test')).length).toBeGreaterThan(0);
+    expect(screen.getByText(/audit_policy_123/)).toBeInTheDocument();
+
+    await user.clear(customerInput);
+    await user.type(customerInput, 'second-customer');
+
+    expect(screen.queryByText('owner@example.test')).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit_policy_123/)).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account policy to view People Access.')).toBeInTheDocument();
+  });
+
   it('renders backend denial without leaking broker secret text', async () => {
     const user = userEvent.setup();
     peopleAccessMocks.getPolicy.mockResolvedValue({
