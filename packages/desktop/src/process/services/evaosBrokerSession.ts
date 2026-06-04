@@ -58,6 +58,7 @@ import type {
   IEvaosSafeUrlSummary,
 } from '@/common/adapter/ipcBridge';
 import { createHash } from 'crypto';
+import { EVAOS_BETA_IDENTITY } from '../evaosBetaSafety';
 
 export const EVAOS_DESKTOP_RUNTIME_SESSION_ENDPOINT =
   'https://rhfojelkgtwcxnrfhtlj.supabase.co/functions/v1/desktop-runtime-session';
@@ -149,6 +150,7 @@ export type EvaosBrokerErrorCode =
   | 'invalid_company_brain_account'
   | 'invalid_company_brain_query'
   | 'invalid_customer'
+  | 'invalid_desktop_callback'
   | 'invalid_email'
   | 'invalid_role'
   | 'invalid_runtime'
@@ -174,7 +176,7 @@ export interface EvaosDesktopSession {
   accessToken: string;
   userEmail?: string;
   expiresAt?: string;
-  source?: 'environment' | 'memory';
+  source?: 'environment' | 'memory' | 'callback';
 }
 
 export type EvaosBrokerFetch = (input: RequestInfo | URL, init?: RequestInit) => Promise<Response>;
@@ -242,6 +244,11 @@ export class EvaosBrokerSessionClient {
       source: 'memory',
     };
 
+    return this.getSessionStatus();
+  }
+
+  importDesktopSessionFromCallbackUrl(callbackUrl: string): IEvaosBrokerSessionStatus {
+    this.session = parseDesktopSessionCallbackUrl(callbackUrl);
     return this.getSessionStatus();
   }
 
@@ -806,6 +813,62 @@ function normalizeDeviceCode(value: string): string {
     .filter((char) => /[A-Z0-9]/.test(char))
     .join('')
     .slice(0, 80);
+}
+
+function parseDesktopSessionCallbackUrl(callbackUrl: string): EvaosDesktopSession {
+  let parsed: URL;
+  try {
+    parsed = new URL(callbackUrl);
+  } catch {
+    throw new EvaosBrokerSessionError(
+      'invalid_desktop_callback',
+      'The evaOS desktop sign-in callback was not recognized.'
+    );
+  }
+
+  if (!isAllowedDesktopSessionCallback(parsed)) {
+    throw new EvaosBrokerSessionError(
+      'invalid_desktop_callback',
+      'The evaOS desktop sign-in callback was not recognized.'
+    );
+  }
+
+  const params = new URLSearchParams(parsed.search);
+  if (parsed.hash.length > 1) {
+    new URLSearchParams(parsed.hash.slice(1)).forEach((value, key) => {
+      if (!params.has(key)) {
+        params.set(key, value);
+      }
+    });
+  }
+
+  const accessToken = safeRawSecret(params.get('desktop_session'));
+  const expiresAt = safeIsoDate(params.get('desktop_session_expires_at') ?? params.get('expires_at'));
+  if (!accessToken || !expiresAt) {
+    throw new EvaosBrokerSessionError(
+      'invalid_desktop_callback',
+      'The evaOS desktop sign-in callback did not include a usable desktop session.'
+    );
+  }
+
+  return {
+    accessToken,
+    expiresAt,
+    userEmail: safeText(params.get('email')),
+    source: 'callback',
+  };
+}
+
+function isAllowedDesktopSessionCallback(url: URL): boolean {
+  const isBetaProtocolCallback =
+    url.protocol === `${EVAOS_BETA_IDENTITY.protocolScheme}:` &&
+    url.hostname === 'auth' &&
+    url.pathname === '/callback';
+  const isLoopbackCallback =
+    url.protocol === 'http:' &&
+    ['127.0.0.1', 'localhost', '::1', '[::1]'].includes(url.hostname) &&
+    url.pathname === '/auth/callback';
+  return isBetaProtocolCallback || isLoopbackCallback;
 }
 
 function normalizeRuntime(runtime: IEvaosRuntimeKey): IEvaosRuntimeKey {
