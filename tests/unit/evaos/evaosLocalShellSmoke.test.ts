@@ -17,6 +17,7 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     hash: string;
     expected: string[];
     forbidden: string[];
+    action?: string;
   }>;
   TEAM_ROUTE_CHECK: {
     name: string;
@@ -48,6 +49,15 @@ describe('evaOS local shell smoke', () => {
       'agent-settings-remote-guardrail',
     ]);
     expect(localShellSmoke.TEAM_ROUTE_CHECK.name).toBe('team-route-redirect');
+  });
+
+  it('exercises customer-target recovery on product routes that depend on Workbench customer context', () => {
+    expect(localShellSmoke.ROUTE_CHECKS.find((check) => check.name === 'people-access-empty-error')?.action).toBe(
+      'click-refresh-targets'
+    );
+    expect(localShellSmoke.ROUTE_CHECKS.find((check) => check.name === 'connected-apps-empty-error')?.action).toBe(
+      'click-refresh-targets'
+    );
   });
 
   it('keeps unsafe and overclaiming shell surfaces forbidden', () => {

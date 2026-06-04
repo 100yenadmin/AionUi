@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { Button, Input, Select, Spin, Tag } from '@arco-design/web-react';
 import { Attention, Peoples, Plus, Refresh } from '@icon-park/react';
@@ -54,6 +54,8 @@ const PeopleAccessPage: React.FC = () => {
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviting, setInviting] = useState(false);
   const customerContext = useEvaosCustomerContext(true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const requestEpochRef = useRef(0);
 
   const canManageMembers = policy?.scopes.includes('manage_members') ?? false;
   const hasBackendPolicyProof = policy?.backendEnforced === true && Boolean(policy.auditId);
@@ -66,20 +68,47 @@ const PeopleAccessPage: React.FC = () => {
     return Object.entries(policy?.advancedSurfaces ?? {}).toSorted(([left], [right]) => left.localeCompare(right));
   }, [policy?.advancedSurfaces]);
 
+  useEffect(() => {
+    selectedCustomerRef.current = customerContext.selectedCustomerId;
+    requestEpochRef.current += 1;
+  }, [customerContext.selectedCustomerId]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
+  }, []);
+
+  const isSelectedCustomer = useCallback((customerId: string) => {
+    return selectedCustomerRef.current === customerId;
+  }, []);
+
   const selectCustomer = useCallback(
     (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
       customerContext.selectCustomer(customerId);
       setPolicy(null);
       setPolicyError(null);
       setInviteStatus(null);
       setInviteError(null);
+      setLoadingPolicy(false);
     },
     [customerContext]
   );
 
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    selectedCustomerRef.current = undefined;
+    setPolicy(null);
+    setPolicyError(null);
+    setInviteStatus(null);
+    setInviteError(null);
+    setLoadingPolicy(false);
+    await customerContext.refreshTargets();
+  }, [customerContext]);
+
   const loadPolicy = useCallback(
     async (options: { resetInviteStatus?: boolean } = {}) => {
-      const selectedCustomerId = customerContext.selectedCustomerId;
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       if (options.resetInviteStatus !== false) {
         setInviteStatus(null);
         setInviteError(null);
@@ -90,28 +119,44 @@ const PeopleAccessPage: React.FC = () => {
         return;
       }
 
+      const requestEpoch = requestEpochRef.current + 1;
+      requestEpochRef.current = requestEpoch;
+      selectedCustomerRef.current = selectedCustomerId;
       setLoadingPolicy(true);
       setPolicyError(null);
       try {
         const response = await evaosPeopleAccess.getPolicy.invoke({ customerId: selectedCustomerId });
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setPolicy(null);
           setPolicyError(safeUiText(response.msg, 'People Access failed closed.'));
           return;
         }
+        if (response.data.selectedCustomerId !== selectedCustomerId) {
+          setPolicy(null);
+          setPolicyError('People Access broker returned evidence for a different customer.');
+          return;
+        }
         setPolicy(response.data);
       } catch {
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         setPolicy(null);
         setPolicyError('People Access broker request failed closed.');
       } finally {
-        setLoadingPolicy(false);
+        if (isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          setLoadingPolicy(false);
+        }
       }
     },
-    [customerContext.selectedCustomerId]
+    [customerContext.selectedCustomerId, isCurrentRequest]
   );
 
   const inviteMember = useCallback(async () => {
-    const selectedCustomerId = customerContext.selectedCustomerId;
+    const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
     setInviteStatus(null);
     setInviteError(null);
     if (!policy || policy.routeDenied || !canManageMembers || !selectedCustomerId) {
@@ -130,13 +175,22 @@ const PeopleAccessPage: React.FC = () => {
         email: inviteEmail,
         role: inviteRole,
       });
+      if (!isSelectedCustomer(selectedCustomerId)) {
+        return;
+      }
       if (!response.success || !response.data || response.data.backendEnforced !== true) {
         setInviteError(safeUiText(response.msg, 'Backend denied the invite action.'));
         return;
       }
       await loadPolicy({ resetInviteStatus: false });
+      if (!isSelectedCustomer(selectedCustomerId)) {
+        return;
+      }
       setInviteStatus(safeUiText(response.data.message, `Invite ${response.data.status}.`));
     } catch {
+      if (!isSelectedCustomer(selectedCustomerId)) {
+        return;
+      }
       setInviteError('Backend denied the invite action.');
     } finally {
       setInviting(false);
@@ -147,6 +201,7 @@ const PeopleAccessPage: React.FC = () => {
     hasBackendPolicyProof,
     inviteEmail,
     inviteRole,
+    isSelectedCustomer,
     loadPolicy,
     policy,
   ]);
@@ -187,14 +242,18 @@ const PeopleAccessPage: React.FC = () => {
                 {customerContext.loading ? 'Loading customer targets...' : selectedCustomerLabel}
               </div>
             </div>
-            <Button
-              className='shrink-0'
-              loading={loadingPolicy || customerContext.loading}
-              disabled={!customerContext.selectedCustomerId}
-              onClick={() => void loadPolicy()}
-            >
-              Load
-            </Button>
+            <div className='flex shrink-0 flex-wrap gap-8px'>
+              <Button loading={customerContext.loading} onClick={() => void refreshCustomerTargets()}>
+                Refresh targets
+              </Button>
+              <Button
+                loading={loadingPolicy || customerContext.loading}
+                disabled={!customerContext.selectedCustomerId}
+                onClick={() => void loadPolicy()}
+              >
+                Load
+              </Button>
+            </div>
           </div>
           <div className='mt-10px flex flex-wrap gap-8px'>
             {customerContext.targets.length === 0 ? (

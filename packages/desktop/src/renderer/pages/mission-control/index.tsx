@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { Button, Spin, Tag } from '@arco-design/web-react';
 import { Attention, CheckOne, Computer, Refresh, Robot } from '@icon-park/react';
@@ -167,6 +167,8 @@ const MissionControlPage: React.FC = () => {
   const [loadingRuntime, setLoadingRuntime] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
   const customerContext = useEvaosCustomerContext(session?.authenticated === true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const requestEpochRef = useRef(0);
 
   const loadSession = useCallback(async (): Promise<IEvaosBrokerSessionStatus | null> => {
     setLoadingSession(true);
@@ -189,15 +191,27 @@ const MissionControlPage: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    selectedCustomerRef.current = customerContext.selectedCustomerId;
+    requestEpochRef.current += 1;
+  }, [customerContext.selectedCustomerId]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
+  }, []);
+
   const refreshMissionControl = useCallback(async () => {
     const nextSession = await loadSession();
     if (!nextSession?.authenticated) {
+      requestEpochRef.current += 1;
       setRuntimeStates(emptyRuntimeStates());
       setLastRefreshedAt(null);
+      setLoadingRuntime(false);
       return;
     }
 
-    if (!customerContext.selectedCustomerId) {
+    const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
+    if (!selectedCustomerId) {
       setRuntimeStates(
         RUNTIME_TARGETS.map((target) => ({
           target,
@@ -209,6 +223,9 @@ const MissionControlPage: React.FC = () => {
       return;
     }
 
+    const requestEpoch = requestEpochRef.current + 1;
+    requestEpochRef.current = requestEpoch;
+    selectedCustomerRef.current = selectedCustomerId;
     setLoadingRuntime(true);
     setRuntimeStates(RUNTIME_TARGETS.map((target) => ({ target, loading: true })));
 
@@ -216,7 +233,7 @@ const MissionControlPage: React.FC = () => {
       RUNTIME_TARGETS.map(async (target): Promise<RuntimeLoadState> => {
         try {
           const response = await evaosBroker.runtimeStatus.invoke({
-            customerId: customerContext.selectedCustomerId,
+            customerId: selectedCustomerId,
             runtime: target.key,
           });
           if (!response.success || !response.data) {
@@ -237,19 +254,34 @@ const MissionControlPage: React.FC = () => {
       })
     );
 
+    if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+      return;
+    }
     setRuntimeStates(results);
     setLastRefreshedAt(new Date().toISOString());
     setLoadingRuntime(false);
-  }, [customerContext.selectedCustomerId, loadSession]);
+  }, [customerContext.selectedCustomerId, isCurrentRequest, loadSession]);
 
   const selectCustomer = useCallback(
     (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
       customerContext.selectCustomer(customerId);
       setRuntimeStates(emptyRuntimeStates());
       setLastRefreshedAt(null);
+      setLoadingRuntime(false);
     },
     [customerContext]
   );
+
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    selectedCustomerRef.current = undefined;
+    setRuntimeStates(emptyRuntimeStates());
+    setLastRefreshedAt(null);
+    setLoadingRuntime(false);
+    await customerContext.refreshTargets();
+  }, [customerContext]);
 
   useEffect(() => {
     void loadSession();
@@ -361,14 +393,18 @@ const MissionControlPage: React.FC = () => {
                       : (selectedCustomerLabel ?? 'No customer selected')}
                   </div>
                 </div>
-                <Button
-                  className='shrink-0'
-                  icon={<Refresh theme='outline' size='15' />}
-                  loading={loadingRuntime || customerContext.loading}
-                  onClick={() => void refreshMissionControl()}
-                >
-                  Check
-                </Button>
+                <div className='flex shrink-0 flex-wrap gap-8px'>
+                  <Button loading={customerContext.loading} onClick={() => void refreshCustomerTargets()}>
+                    Refresh targets
+                  </Button>
+                  <Button
+                    icon={<Refresh theme='outline' size='15' />}
+                    loading={loadingRuntime || customerContext.loading}
+                    onClick={() => void refreshMissionControl()}
+                  >
+                    Check
+                  </Button>
+                </div>
               </div>
               <div className='mt-10px flex flex-wrap gap-8px'>
                 {customerContext.targets.length === 0 ? (

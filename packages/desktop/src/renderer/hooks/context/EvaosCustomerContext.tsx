@@ -27,6 +27,7 @@ const EMPTY_STATE: EvaosCustomerContextState = {
 };
 
 let state: EvaosCustomerContextState = EMPTY_STATE;
+let requestEpoch = 0;
 const listeners = new Set<() => void>();
 
 function emit(next: EvaosCustomerContextState): void {
@@ -62,6 +63,7 @@ function chooseSelectedCustomer(view: IEvaosCustomerTargetsView): string | undef
 }
 
 export function clearEvaosCustomerContext(): void {
+  requestEpoch += 1;
   emit(EMPTY_STATE);
 }
 
@@ -75,6 +77,8 @@ export function selectEvaosCustomer(customerId: string): void {
 }
 
 export async function refreshEvaosCustomerTargets(): Promise<void> {
+  const epoch = requestEpoch + 1;
+  requestEpoch = epoch;
   emit({
     ...state,
     loading: true,
@@ -83,6 +87,9 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
 
   try {
     const response = await evaosBroker.getCustomerTargets.invoke();
+    if (epoch !== requestEpoch) {
+      return;
+    }
     if (!response.success || !response.data) {
       emit({
         ...EMPTY_STATE,
@@ -91,6 +98,9 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
       return;
     }
 
+    if (epoch !== requestEpoch) {
+      return;
+    }
     emit({
       targets: response.data.customers,
       selectedCustomerId: chooseSelectedCustomer(response.data),
@@ -99,6 +109,9 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
       error: undefined,
     });
   } catch {
+    if (epoch !== requestEpoch) {
+      return;
+    }
     emit({
       ...EMPTY_STATE,
       error: 'Customer targets broker request failed closed.',

@@ -25,10 +25,12 @@ const ROUTE_CHECKS = [
     name: 'people-access-empty-error',
     hash: '/people-access',
     title: 'People Access',
+    action: 'click-refresh-targets',
     expected: [
       'People Access',
       'Members, roles, invites, and seats from the evaOS account policy plane.',
       'Customer context',
+      'Refresh targets',
       'Load a customer account policy to view People Access.',
       'Sign in to evaOS before loading customer targets.',
     ],
@@ -51,10 +53,12 @@ const ROUTE_CHECKS = [
     name: 'connected-apps-empty-error',
     hash: '/connected-apps',
     title: 'Connected Apps',
+    action: 'click-refresh-targets',
     expected: [
       'Connected Apps',
       'Brokered provider status, grants, and revocation',
       'Customer context',
+      'Refresh targets',
       'Load a customer account to view connected app evidence.',
       'Sign in to evaOS before loading customer targets.',
     ],
@@ -213,6 +217,12 @@ async function clickLoad(page) {
   await page.waitForTimeout(250);
 }
 
+async function clickRefreshTargets(page) {
+  const refreshTargetsButton = page.getByRole('button', { name: /^Refresh targets$/ }).first();
+  await refreshTargetsButton.click();
+  await page.waitForTimeout(350);
+}
+
 async function bodyText(page, timeout = 1500) {
   return page
     .locator('body')
@@ -351,6 +361,8 @@ async function runLocalShellSmoke(options = {}) {
       }
       if (check.action === 'click-load') {
         await clickLoad(page);
+      } else if (check.action === 'click-refresh-targets') {
+        await clickRefreshTargets(page);
       }
       const text = await page.locator('body').innerText({ timeout: 10000 });
       findings.push(...textFindings(check.name, text, check.expected, check.forbidden));

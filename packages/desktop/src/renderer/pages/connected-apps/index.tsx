@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { Button, Select, Spin, Tag } from '@arco-design/web-react';
 import { Attention, CheckOne, CloseOne, Connection, Refresh, Shield } from '@icon-park/react';
@@ -62,6 +62,8 @@ const ConnectedAppsPage: React.FC = () => {
   const [actionTarget, setActionTarget] = useState<string | null>(null);
   const [agentRuntime, setAgentRuntime] = useState<IEvaosProviderAgentRuntime>('openclaw');
   const customerContext = useEvaosCustomerContext(true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const requestEpochRef = useRef(0);
 
   const canManageIntegrations = !hub?.routeDenied;
   const readyCount = useMemo(
@@ -81,21 +83,49 @@ const ConnectedAppsPage: React.FC = () => {
     [hub?.profiles]
   );
 
+  useEffect(() => {
+    selectedCustomerRef.current = customerContext.selectedCustomerId;
+    requestEpochRef.current += 1;
+  }, [customerContext.selectedCustomerId]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
+  }, []);
+
+  const isSelectedCustomer = useCallback((customerId: string) => {
+    return selectedCustomerRef.current === customerId;
+  }, []);
+
   const selectCustomer = useCallback(
     (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
       customerContext.selectCustomer(customerId);
       setHub(null);
       setHubError(null);
       setActionStatus(null);
       setActionError(null);
       setActionTarget(null);
+      setLoadingHub(false);
     },
     [customerContext]
   );
 
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    selectedCustomerRef.current = undefined;
+    setHub(null);
+    setHubError(null);
+    setActionStatus(null);
+    setActionError(null);
+    setActionTarget(null);
+    setLoadingHub(false);
+    await customerContext.refreshTargets();
+  }, [customerContext]);
+
   const loadHub = useCallback(
     async (options: { resetActionStatus?: boolean } = {}) => {
-      const selectedCustomerId = customerContext.selectedCustomerId;
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       if (options.resetActionStatus !== false) {
         setActionStatus(null);
         setActionError(null);
@@ -106,24 +136,40 @@ const ConnectedAppsPage: React.FC = () => {
         return;
       }
 
+      const requestEpoch = requestEpochRef.current + 1;
+      requestEpochRef.current = requestEpoch;
+      selectedCustomerRef.current = selectedCustomerId;
       setLoadingHub(true);
       setHubError(null);
       try {
         const response = await evaosProviderHub.getProfiles.invoke({ customerId: selectedCustomerId });
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setHub(null);
           setHubError(safeUiText(response.msg, 'Connected Apps failed closed.'));
           return;
         }
+        if (response.data.customerId !== selectedCustomerId) {
+          setHub(null);
+          setHubError('Connected Apps broker returned evidence for a different customer.');
+          return;
+        }
         setHub(response.data);
       } catch {
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         setHub(null);
         setHubError('Connected Apps broker request failed closed.');
       } finally {
-        setLoadingHub(false);
+        if (isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          setLoadingHub(false);
+        }
       }
     },
-    [customerContext.selectedCustomerId]
+    [customerContext.selectedCustomerId, isCurrentRequest]
   );
 
   const clearLoadedHubForTargetChange = useCallback(
@@ -138,7 +184,7 @@ const ConnectedAppsPage: React.FC = () => {
 
   const runProviderAction = useCallback(
     async (providerKey: IEvaosProviderKey, action: 'startAuth' | 'switchProvider' | 'revokeProvider' | 'mintGrant') => {
-      const selectedCustomerId = customerContext.selectedCustomerId;
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       setActionStatus(null);
       setActionError(null);
       if (!hub || hub.routeDenied || !canManageIntegrations || !selectedCustomerId) {
@@ -154,23 +200,36 @@ const ConnectedAppsPage: React.FC = () => {
           agentRuntime: action === 'mintGrant' ? agentRuntime : undefined,
         };
         const response = await evaosProviderHub[action].invoke(request);
+        if (!isSelectedCustomer(selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setActionError(safeUiText(response.msg, 'Backend denied the provider action.'));
           return;
         }
         if (response.data.providerHub) {
+          if (response.data.providerHub.customerId !== selectedCustomerId) {
+            setActionError('Backend returned provider evidence for a different customer.');
+            return;
+          }
           setHub(response.data.providerHub);
         } else {
           await loadHub({ resetActionStatus: false });
+          if (!isSelectedCustomer(selectedCustomerId)) {
+            return;
+          }
         }
         setActionStatus(actionSummary(response.data));
       } catch {
+        if (!isSelectedCustomer(selectedCustomerId)) {
+          return;
+        }
         setActionError('Backend denied the provider action.');
       } finally {
         setActionTarget(null);
       }
     },
-    [agentRuntime, canManageIntegrations, customerContext.selectedCustomerId, hub, loadHub]
+    [agentRuntime, canManageIntegrations, customerContext.selectedCustomerId, hub, isSelectedCustomer, loadHub]
   );
 
   return (
@@ -216,14 +275,18 @@ const ConnectedAppsPage: React.FC = () => {
                 {customerContext.loading ? 'Loading customer targets...' : selectedCustomerLabel}
               </div>
             </div>
-            <Button
-              className='shrink-0'
-              loading={loadingHub || customerContext.loading}
-              disabled={!customerContext.selectedCustomerId}
-              onClick={() => void loadHub()}
-            >
-              Load
-            </Button>
+            <div className='flex shrink-0 flex-wrap gap-8px'>
+              <Button loading={customerContext.loading} onClick={() => void refreshCustomerTargets()}>
+                Refresh targets
+              </Button>
+              <Button
+                loading={loadingHub || customerContext.loading}
+                disabled={!customerContext.selectedCustomerId}
+                onClick={() => void loadHub()}
+              >
+                Load
+              </Button>
+            </div>
           </div>
           <div className='mt-10px flex flex-wrap gap-8px'>
             {customerContext.targets.length === 0 ? (

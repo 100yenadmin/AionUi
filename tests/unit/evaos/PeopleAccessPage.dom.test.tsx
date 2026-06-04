@@ -6,7 +6,7 @@
 
 import React from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { clearEvaosCustomerContext } from '@/renderer/hooks/context/EvaosCustomerContext';
 import PeopleAccessPage from '@/renderer/pages/people-access';
@@ -73,36 +73,48 @@ function policy(scopes: string[], overrides: Record<string, unknown> = {}) {
   };
 }
 
+function customerTargets() {
+  return {
+    success: true,
+    data: {
+      roles: ['admin'],
+      isOperator: true,
+      defaultCustomerId: 'david-poku',
+      selectedCustomerId: 'david-poku',
+      customers: [
+        {
+          customerId: 'david-poku',
+          displayName: 'David Poku Co',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: true,
+        },
+        {
+          customerId: 'second-customer',
+          displayName: 'Second Customer',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: false,
+        },
+      ],
+      summaryText: '2 customer targets loaded',
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
+}
+
 describe('PeopleAccessPage', () => {
   beforeEach(() => {
     clearEvaosCustomerContext();
     brokerMocks.getCustomerTargets.mockReset();
-    brokerMocks.getCustomerTargets.mockResolvedValue({
-      success: true,
-      data: {
-        roles: ['admin'],
-        isOperator: true,
-        defaultCustomerId: 'david-poku',
-        selectedCustomerId: 'david-poku',
-        customers: [
-          {
-            customerId: 'david-poku',
-            displayName: 'David Poku Co',
-            status: 'active',
-            healthStatus: 'ready',
-            isDefault: true,
-          },
-          {
-            customerId: 'second-customer',
-            displayName: 'Second Customer',
-            status: 'active',
-            healthStatus: 'ready',
-            isDefault: false,
-          },
-        ],
-        summaryText: '2 customer targets loaded',
-      },
-    });
+    brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
     peopleAccessMocks.getPolicy.mockReset();
     peopleAccessMocks.inviteMember.mockReset();
   });
@@ -217,6 +229,82 @@ describe('PeopleAccessPage', () => {
     expect(peopleAccessMocks.getPolicy).toHaveBeenCalledTimes(1);
   });
 
+  it('uses the selected non-default customer for policy loads and invites', async () => {
+    const user = userEvent.setup();
+    peopleAccessMocks.getPolicy.mockResolvedValue({
+      success: true,
+      data: policy(['manage_members'], {
+        selectedCustomerId: 'second-customer',
+        members: [
+          {
+            memberId: 'mem_second',
+            email: 'second-owner@example.test',
+            role: 'owner',
+            status: 'active',
+          },
+        ],
+      }),
+    });
+    peopleAccessMocks.inviteMember.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'created',
+        message: 'Invite created.',
+        inviteId: 'inv_second',
+        backendEnforced: true,
+      },
+    });
+
+    render(<PeopleAccessPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect((await screen.findAllByText('second-owner@example.test')).length).toBeGreaterThan(0);
+    expect(peopleAccessMocks.getPolicy).toHaveBeenCalledWith({ customerId: 'second-customer' });
+
+    await user.type(screen.getByPlaceholderText('employee@example.com'), 'new@example.test');
+    await user.click(screen.getByRole('button', { name: /^invite$/i }));
+
+    await waitFor(() => {
+      expect(peopleAccessMocks.inviteMember).toHaveBeenCalledWith({
+        customerId: 'second-customer',
+        email: 'new@example.test',
+        role: 'member',
+      });
+    });
+  });
+
+  it('does not render stale policy evidence when the selected customer changes before the broker responds', async () => {
+    const user = userEvent.setup();
+    const pendingPolicy = deferred<{
+      success: boolean;
+      data: ReturnType<typeof policy>;
+    }>();
+    peopleAccessMocks.getPolicy.mockReturnValueOnce(pendingPolicy.promise);
+
+    render(<PeopleAccessPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(peopleAccessMocks.getPolicy).toHaveBeenCalledWith({ customerId: 'david-poku' });
+
+    await user.click(screen.getByRole('button', { name: 'Second Customer' }));
+
+    await act(async () => {
+      pendingPolicy.resolve({
+        success: true,
+        data: policy(['manage_members']),
+      });
+      await pendingPolicy.promise;
+    });
+
+    expect(screen.queryByText('owner@example.test')).not.toBeInTheDocument();
+    expect(screen.queryByText(/audit_policy_123/)).not.toBeInTheDocument();
+    expect(screen.getByText('Load a customer account policy to view People Access.')).toBeInTheDocument();
+  });
+
   it('renders backend denial without leaking broker secret text', async () => {
     const user = userEvent.setup();
     peopleAccessMocks.getPolicy.mockResolvedValue({
@@ -239,5 +327,26 @@ describe('PeopleAccessPage', () => {
 
     expect(await screen.findByText('Backend denied the invite action.')).toBeInTheDocument();
     expect(container.textContent).not.toContain('eds_raw_backend_secret');
+  });
+
+  it('lets operators retry customer targets after a broker failure', async () => {
+    const user = userEvent.setup();
+    brokerMocks.getCustomerTargets.mockReset();
+    brokerMocks.getCustomerTargets
+      .mockResolvedValueOnce({
+        success: false,
+        msg: 'eds_raw_customer_target_secret should not render',
+      })
+      .mockResolvedValueOnce(customerTargets());
+
+    const { container } = render(<PeopleAccessPage />);
+
+    expect(await screen.findByText('Customer targets failed closed.')).toBeInTheDocument();
+    expect(container.textContent).not.toContain('eds_raw_customer_target_secret');
+
+    await user.click(screen.getByRole('button', { name: /^refresh targets$/i }));
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    expect(brokerMocks.getCustomerTargets).toHaveBeenCalledTimes(2);
   });
 });
