@@ -76,4 +76,58 @@ describe('evaOS trust-surface bridge renderer secret boundary', () => {
       msg: 'The evaOS broker response included renderer-visible secret material at $.profiles[0].access_token.',
     });
   });
+
+  it('allows safe Connected Apps secret-state booleans while still blocking raw handles', async () => {
+    const { initEvaosProviderHubBridge, ipcBridge } = await loadTrustSurfaceBridge();
+    const client = {
+      providerHub: vi.fn(async () => ({
+        schemaVersion: 'evaos.provider_hub.v1',
+        customerId: 'cus_123',
+        routeDenied: false,
+        profiles: [
+          {
+            providerKey: 'google_workspace',
+            title: 'Google Workspace',
+            status: 'connected',
+            active: true,
+            rawSecretsStoredInWorkbench: false,
+            hasBrokeredGrant: true,
+            grantedScopes: ['mail.read'],
+            capabilities: ['mail.read'],
+            hasConnectionProof: true,
+            summaryText: 'Ready',
+          },
+        ],
+        summaryText: '1 provider loaded',
+        backendEnforced: true,
+      })),
+    } as unknown as EvaosBrokerSessionClient;
+
+    initEvaosProviderHubBridge(client);
+
+    const handler = lastProviderHandler(vi.mocked(ipcBridge.evaosProviderHub.getProfiles.provider));
+    await expect(handler({ customerId: 'cus_123' })).resolves.toMatchObject({
+      success: true,
+      data: {
+        profiles: [
+          {
+            rawSecretsStoredInWorkbench: false,
+            hasBrokeredGrant: true,
+          },
+        ],
+      },
+    });
+
+    client.providerHub = vi.fn(async () => ({
+      schemaVersion: 'evaos.provider_hub.v1',
+      customerId: 'cus_123',
+      routeDenied: false,
+      profiles: [{ providerKey: 'google_workspace', grant_handle: 'epg_raw_handle_should_not_render' }],
+    })) as EvaosBrokerSessionClient['providerHub'];
+
+    await expect(handler({ customerId: 'cus_123' })).resolves.toEqual({
+      success: false,
+      msg: 'The evaOS broker response included renderer-visible secret material at $.profiles[0].grant_handle.',
+    });
+  });
 });

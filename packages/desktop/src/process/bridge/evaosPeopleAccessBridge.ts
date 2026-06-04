@@ -34,6 +34,11 @@ import {
   getDefaultEvaosBrokerSessionClient,
   type EvaosBrokerSessionClient,
 } from '@process/services/evaosBrokerSession';
+import {
+  evaosLocalProductFixtureProviderAction,
+  evaosLocalProductFixtureProviderHub,
+  isEvaosLocalProductFixtureEnabled,
+} from '@process/services/evaosLocalProductFixture';
 import { assertEvaosRendererSafePayload } from './evaosRendererSecretGuard';
 
 interface BridgeResponse<D = {}> {
@@ -75,27 +80,45 @@ export function initEvaosProviderHubBridge(
 ): void {
   ipcBridge.evaosProviderHub.getProfiles.provider(
     async (request: IEvaosProviderHubRequest): Promise<BridgeResponse<IEvaosProviderHubView>> =>
-      toBridgeResponse(() => client.providerHub(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled() ? evaosLocalProductFixtureProviderHub(request) : client.providerHub(request)
+      )
   );
 
   ipcBridge.evaosProviderHub.startAuth.provider(
     async (request: IEvaosProviderActionRequest): Promise<BridgeResponse<IEvaosProviderActionResult>> =>
-      toBridgeResponse(() => client.startProviderAuth(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureProviderAction(request, 'provider_auth_start')
+          : client.startProviderAuth(request)
+      )
   );
 
   ipcBridge.evaosProviderHub.switchProvider.provider(
     async (request: IEvaosProviderActionRequest): Promise<BridgeResponse<IEvaosProviderActionResult>> =>
-      toBridgeResponse(() => client.switchProvider(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureProviderAction(request, 'provider_switch')
+          : client.switchProvider(request)
+      )
   );
 
   ipcBridge.evaosProviderHub.revokeProvider.provider(
     async (request: IEvaosProviderActionRequest): Promise<BridgeResponse<IEvaosProviderActionResult>> =>
-      toBridgeResponse(() => client.revokeProvider(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureProviderAction(request, 'provider_revoke')
+          : client.revokeProvider(request)
+      )
   );
 
   ipcBridge.evaosProviderHub.mintGrant.provider(
     async (request: IEvaosProviderActionRequest): Promise<BridgeResponse<IEvaosProviderActionResult>> =>
-      toBridgeResponse(() => client.mintProviderGrant(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureProviderAction(request, 'provider_mint_grant')
+          : client.mintProviderGrant(request)
+      )
   );
 }
 
@@ -142,7 +165,7 @@ export function initEvaosCompanyBrainBridge(
   );
 }
 
-async function toBridgeResponse<D>(operation: () => Promise<D>): Promise<BridgeResponse<D>> {
+async function toBridgeResponse<D>(operation: () => D | Promise<D>): Promise<BridgeResponse<D>> {
   try {
     const data = await operation();
     assertEvaosRendererSafePayload(data);

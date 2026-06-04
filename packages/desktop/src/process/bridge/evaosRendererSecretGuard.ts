@@ -6,6 +6,8 @@
 
 import { containsEvaosSecretMaterial, EvaosBrokerSessionError } from '@process/services/evaosBrokerSession';
 
+const SAFE_SECRET_METADATA_KEYS = new Set(['rawSecretsStoredInWorkbench', 'hasBrokeredGrant']);
+
 export function assertEvaosRendererSafePayload(value: unknown): void {
   assertEvaosRendererSafePayloadAt(value, '$', new WeakSet<object>(), 0);
 }
@@ -40,11 +42,15 @@ function assertEvaosRendererSafePayloadAt(value: unknown, path: string, seen: We
   }
 
   for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-    if (containsEvaosSecretMaterial(key)) {
+    if (containsEvaosSecretMaterial(key) && !isSafeSecretMetadata(key, child)) {
       throwRendererSecretError(`${path}.${key}`);
     }
     assertEvaosRendererSafePayloadAt(child, `${path}.${key}`, seen, depth + 1);
   }
+}
+
+function isSafeSecretMetadata(key: string, value: unknown): boolean {
+  return SAFE_SECRET_METADATA_KEYS.has(key) && typeof value === 'boolean';
 }
 
 function throwRendererSecretError(path: string): never {

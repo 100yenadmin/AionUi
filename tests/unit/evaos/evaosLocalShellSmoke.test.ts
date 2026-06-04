@@ -28,6 +28,18 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     action?: string;
     isolateRendererState?: boolean;
   }>;
+  LOCAL_PRODUCT_ROUTE_CHECKS: Array<{
+    name: string;
+    hash: string;
+    title: string;
+    expected: string[];
+    forbidden: string[];
+    proofStage: string;
+    settledMarkers: string[];
+    loadedStateRequiredMarkers: string[];
+    action?: string;
+    isolateRendererState?: boolean;
+  }>;
   TEAM_ROUTE_CHECK: {
     name: string;
     hash: string;
@@ -36,6 +48,18 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
   };
   relevantConsoleErrors: (messages: Array<{ type: string; text: string }>) => Array<{ type: string; text: string }>;
   loadPlaywrightElectron: (repoRoot: string, requirePlaywright?: (id: string) => unknown) => unknown;
+  routeChecksForEnv: (env?: NodeJS.ProcessEnv) => Array<{
+    name: string;
+    hash: string;
+    title: string;
+    expected: string[];
+    forbidden: string[];
+    proofStage: string;
+    settledMarkers: string[];
+    loadedStateRequiredMarkers: string[];
+    action?: string;
+    isolateRendererState?: boolean;
+  }>;
   shellSmokeEnv: (artifactsDir: string, env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
   textFindings: (
     route: string,
@@ -74,6 +98,38 @@ describe('evaOS local shell smoke', () => {
       );
       expect(route.settledMarkers.some((marker) => marker !== route.title)).toBe(true);
     }
+  });
+
+  it('keeps local loaded product proof separate from default shell smoke', () => {
+    expect(localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.map((check) => check.name)).toEqual([
+      'connected-apps-loaded-fixture',
+    ]);
+
+    const connectedAppsLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS[0];
+    expect(connectedAppsLoaded.proofStage).toBe(localShellSmoke.PROOF_STAGES.PRODUCT_LOADED_STATE);
+    expect(connectedAppsLoaded.action).toBe('click-load');
+    expect(connectedAppsLoaded.expected).toEqual(
+      expect.arrayContaining([
+        'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+        'Google Workspace',
+        'Slack',
+        'Notion',
+        'GitHub',
+        'Linear',
+        'local-fixture:provider_profiles',
+        'fixture-audit-providers',
+      ])
+    );
+    expect(connectedAppsLoaded.forbidden).toEqual(
+      expect.arrayContaining(['desktop_session', 'provider_grant', 'grant_handle'])
+    );
+  });
+
+  it('selects loaded product checks only when local fixture mode is explicitly enabled', () => {
+    expect(localShellSmoke.routeChecksForEnv({})).toBe(localShellSmoke.ROUTE_CHECKS);
+    expect(localShellSmoke.routeChecksForEnv({ AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE: '1' })).toBe(
+      localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS
+    );
   });
 
   it('keeps future loaded-state proof markers distinct from title-only waits', () => {
