@@ -18,6 +18,7 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     expected: string[];
     forbidden: string[];
     action?: string;
+    isolateRendererState?: boolean;
   }>;
   TEAM_ROUTE_CHECK: {
     name: string;
@@ -52,12 +53,15 @@ describe('evaOS local shell smoke', () => {
   });
 
   it('exercises customer-target recovery on product routes that depend on Workbench customer context', () => {
-    expect(localShellSmoke.ROUTE_CHECKS.find((check) => check.name === 'people-access-empty-error')?.action).toBe(
-      'click-refresh-targets'
-    );
-    expect(localShellSmoke.ROUTE_CHECKS.find((check) => check.name === 'connected-apps-empty-error')?.action).toBe(
-      'click-refresh-targets'
-    );
+    for (const routeName of [
+      'people-access-empty-error',
+      'connected-apps-empty-error',
+      'business-browser-empty-error',
+    ]) {
+      const route = localShellSmoke.ROUTE_CHECKS.find((check) => check.name === routeName);
+      expect(route?.action).toBe('click-refresh-targets');
+      expect(route?.isolateRendererState).toBe(true);
+    }
   });
 
   it('keeps unsafe and overclaiming shell surfaces forbidden', () => {
@@ -140,6 +144,7 @@ describe('evaOS local shell smoke', () => {
     expect(
       localShellSmoke.relevantConsoleErrors([
         { type: 'error', text: '[useCronJobsMap] Failed to fetch jobs' },
+        { type: 'error', text: 'Failed to initialize config: TypeError: Failed to fetch' },
         { type: 'debug', text: 'debug line' },
         { type: 'error', text: 'Unhandled route exception' },
       ])

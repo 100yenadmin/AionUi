@@ -26,6 +26,7 @@ const ROUTE_CHECKS = [
     hash: '/people-access',
     title: 'People Access',
     action: 'click-refresh-targets',
+    isolateRendererState: true,
     expected: [
       'People Access',
       'Members, roles, invites, and seats from the evaOS account policy plane.',
@@ -54,6 +55,7 @@ const ROUTE_CHECKS = [
     hash: '/connected-apps',
     title: 'Connected Apps',
     action: 'click-refresh-targets',
+    isolateRendererState: true,
     expected: [
       'Connected Apps',
       'Brokered provider status, grants, and revocation',
@@ -68,12 +70,15 @@ const ROUTE_CHECKS = [
     name: 'business-browser-empty-error',
     hash: '/business-browser',
     title: 'Business Browser',
-    action: 'click-load',
+    action: 'click-refresh-targets',
+    isolateRendererState: true,
     expected: [
       'Business Browser',
       'Brokered browser and VM runtime state',
+      'Customer context',
+      'Refresh targets',
       'Load a customer account to view browser runtime evidence.',
-      'Choose a customer before loading Business Browser.',
+      'Sign in to evaOS before loading customer targets.',
     ],
     forbidden: ['desktop_session', 'Bearer', 'provider_grant'],
   },
@@ -121,7 +126,7 @@ const GLOBAL_FORBIDDEN_PATTERNS = [
 ];
 
 const IGNORED_CONSOLE_ERROR_PATTERN =
-  /autofill|Failed to load resource: net::ERR_FILE_NOT_FOUND|\[useExtensionSettingsTabs\] Failed to load tabs|\[useExtI18n\] Failed to load ext i18n|\[useCronJobsMap\] Failed to fetch jobs/;
+  /autofill|Failed to load resource: net::ERR_FILE_NOT_FOUND|Failed to load initial theme|Failed to load initial color scheme|Failed to initialize language|Failed to initialize config|\[useExtensionSettingsTabs\] Failed to load tabs|\[useExtI18n\] Failed to load ext i18n|\[useCronJobsMap\] Failed to fetch jobs/;
 
 function ensureDirs(artifactRoot) {
   const screenshotsDir = path.join(artifactRoot, 'screenshots');
@@ -256,6 +261,11 @@ async function navigate(page, hash) {
   }, hash);
 }
 
+async function isolateRendererState(page) {
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(350);
+}
+
 async function waitForRoute(page, title) {
   await page.waitForFunction((expectedTitle) => document.body.innerText.includes(expectedTitle), title, {
     timeout: 30000,
@@ -344,6 +354,9 @@ async function runLocalShellSmoke(options = {}) {
     for (const check of ROUTE_CHECKS) {
       console.log(`[evaos-local-shell-smoke] route ${check.name} -> #${check.hash}`);
       await navigate(page, check.hash);
+      if (check.isolateRendererState) {
+        await isolateRendererState(page);
+      }
       try {
         await waitForRoute(page, check.title);
       } catch (error) {

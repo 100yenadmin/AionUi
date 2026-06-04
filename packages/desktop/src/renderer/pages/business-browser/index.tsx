@@ -4,10 +4,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import classNames from 'classnames';
 import { Button, Input, Spin, Tag } from '@arco-design/web-react';
 import { Attention, Browser, CloseOne, Open, Refresh, Shield } from '@icon-park/react';
+import { useEvaosCustomerContext } from '@renderer/hooks/context/EvaosCustomerContext';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import {
   evaosBusinessBrowser,
@@ -48,7 +49,6 @@ function actionSummary(result: IEvaosBusinessBrowserActionResult): string {
 const BusinessBrowserPage: React.FC = () => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
-  const [customerId, setCustomerId] = useState('');
   const [browserView, setBrowserView] = useState<IEvaosBusinessBrowserView | null>(null);
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(false);
@@ -56,32 +56,94 @@ const BusinessBrowserPage: React.FC = () => {
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionTarget, setActionTarget] = useState<'launch' | 'openUrl' | 'stop' | null>(null);
+  const customerContext = useEvaosCustomerContext(true);
+  const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const previousSelectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
+  const requestEpochRef = useRef(0);
+  const actionEpochRef = useRef(0);
+  const activeActionRef = useRef(false);
 
-  const handleCustomerChange = useCallback((value: string) => {
-    setCustomerId(value);
+  useEffect(() => {
+    const nextSelectedCustomerId = customerContext.selectedCustomerId;
+    const previousSelectedCustomerId = previousSelectedCustomerRef.current;
+    selectedCustomerRef.current = nextSelectedCustomerId;
+    if (previousSelectedCustomerId === nextSelectedCustomerId) {
+      return;
+    }
+    previousSelectedCustomerRef.current = nextSelectedCustomerId;
+    requestEpochRef.current += 1;
+    actionEpochRef.current += 1;
+    activeActionRef.current = false;
     setBrowserView(null);
     setBrowserError(null);
     setActionStatus(null);
     setActionError(null);
+    setActionTarget(null);
+    setLoadingStatus(false);
+  }, [customerContext.selectedCustomerId]);
+
+  const isCurrentRequest = useCallback((epoch: number, customerId: string) => {
+    return requestEpochRef.current === epoch && selectedCustomerRef.current === customerId;
   }, []);
+
+  const isSelectedCustomer = useCallback((customerId: string) => {
+    return selectedCustomerRef.current === customerId;
+  }, []);
+
+  const selectCustomer = useCallback(
+    (customerId: string) => {
+      selectedCustomerRef.current = customerId;
+      requestEpochRef.current += 1;
+      actionEpochRef.current += 1;
+      activeActionRef.current = false;
+      customerContext.selectCustomer(customerId);
+      setBrowserView(null);
+      setBrowserError(null);
+      setActionStatus(null);
+      setActionError(null);
+      setActionTarget(null);
+      setLoadingStatus(false);
+    },
+    [customerContext]
+  );
+
+  const refreshCustomerTargets = useCallback(async () => {
+    requestEpochRef.current += 1;
+    actionEpochRef.current += 1;
+    activeActionRef.current = false;
+    selectedCustomerRef.current = undefined;
+    setBrowserView(null);
+    setBrowserError(null);
+    setActionStatus(null);
+    setActionError(null);
+    setActionTarget(null);
+    setLoadingStatus(false);
+    await customerContext.refreshTargets();
+  }, [customerContext]);
 
   const loadStatus = useCallback(
     async (options: { resetActionStatus?: boolean } = {}) => {
-      const trimmedCustomerId = customerId.trim();
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       if (options.resetActionStatus !== false) {
         setActionStatus(null);
         setActionError(null);
       }
-      if (!trimmedCustomerId) {
+      if (!selectedCustomerId) {
         setBrowserView(null);
         setBrowserError('Choose a customer before loading Business Browser.');
         return;
       }
 
+      const requestEpoch = requestEpochRef.current + 1;
+      requestEpochRef.current = requestEpoch;
+      selectedCustomerRef.current = selectedCustomerId;
       setLoadingStatus(true);
       setBrowserError(null);
       try {
-        const response = await evaosBusinessBrowser.getStatus.invoke({ customerId: trimmedCustomerId });
+        const response = await evaosBusinessBrowser.getStatus.invoke({ customerId: selectedCustomerId });
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         if (!response.success || !response.data) {
           setBrowserView(null);
           setBrowserError(safeUiText(response.msg, 'Business Browser failed closed.'));
@@ -89,21 +151,40 @@ const BusinessBrowserPage: React.FC = () => {
         }
         setBrowserView(response.data);
       } catch {
+        if (!isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          return;
+        }
         setBrowserView(null);
         setBrowserError('Business Browser broker request failed closed.');
       } finally {
-        setLoadingStatus(false);
+        if (isCurrentRequest(requestEpoch, selectedCustomerId)) {
+          setLoadingStatus(false);
+        }
       }
     },
-    [customerId]
+    [customerContext.selectedCustomerId, isCurrentRequest]
   );
+
+  const clearLoadedStatusForTargetChange = useCallback(
+    (customerId: string) => {
+      selectCustomer(customerId);
+    },
+    [selectCustomer]
+  );
+
+  const selectedCustomerLabel =
+    customerContext.selectedTarget?.displayName ?? customerContext.selectedCustomerId ?? 'No customer selected';
+  const actionInFlight = actionTarget !== null;
 
   const runBrowserAction = useCallback(
     async (action: 'launch' | 'openUrl' | 'stop') => {
-      const trimmedCustomerId = customerId.trim();
+      const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
       setActionStatus(null);
       setActionError(null);
-      if (!browserView || browserView.routeDenied) {
+      if (activeActionRef.current) {
+        return;
+      }
+      if (!browserView || browserView.routeDenied || !selectedCustomerId) {
         setActionError('Action denied by account policy.');
         return;
       }
@@ -112,12 +193,20 @@ const BusinessBrowserPage: React.FC = () => {
         return;
       }
 
+      const actionEpoch = actionEpochRef.current + 1;
+      actionEpochRef.current = actionEpoch;
+      activeActionRef.current = true;
+      const isCurrentAction = () => actionEpochRef.current === actionEpoch && isSelectedCustomer(selectedCustomerId);
+
       setActionTarget(action);
       try {
         const response =
           action === 'openUrl'
-            ? await evaosBusinessBrowser.openUrl.invoke({ customerId: trimmedCustomerId, url: openUrl })
-            : await evaosBusinessBrowser[action].invoke({ customerId: trimmedCustomerId });
+            ? await evaosBusinessBrowser.openUrl.invoke({ customerId: selectedCustomerId, url: openUrl })
+            : await evaosBusinessBrowser[action].invoke({ customerId: selectedCustomerId });
+        if (!isCurrentAction()) {
+          return;
+        }
         if (!response.success || !response.data) {
           setActionError(safeUiText(response.msg, 'Backend denied the browser action.'));
           return;
@@ -126,15 +215,24 @@ const BusinessBrowserPage: React.FC = () => {
           setBrowserView(response.data.browser);
         } else {
           await loadStatus({ resetActionStatus: false });
+          if (!isCurrentAction()) {
+            return;
+          }
         }
         setActionStatus(actionSummary(response.data));
       } catch {
+        if (!isCurrentAction()) {
+          return;
+        }
         setActionError('Backend denied the browser action.');
       } finally {
-        setActionTarget(null);
+        if (actionEpochRef.current === actionEpoch) {
+          activeActionRef.current = false;
+          setActionTarget(null);
+        }
       }
     },
-    [browserView, customerId, loadStatus, openUrl]
+    [browserView, customerContext.selectedCustomerId, isSelectedCustomer, loadStatus, openUrl]
   );
 
   return (
@@ -156,6 +254,7 @@ const BusinessBrowserPage: React.FC = () => {
             type='primary'
             icon={<Refresh theme='outline' size='16' />}
             loading={loadingStatus}
+            disabled={actionInFlight || !customerContext.selectedCustomerId}
             onClick={() => void loadStatus()}
           >
             Refresh
@@ -163,21 +262,53 @@ const BusinessBrowserPage: React.FC = () => {
         </header>
 
         <section className='rounded-8px border border-solid border-[var(--color-border-2)] bg-fill-1 p-14px'>
-          <label className='block text-13px font-medium leading-20px text-t-primary' htmlFor='browser-customer-id'>
-            Customer context
-          </label>
-          <div className='mt-8px flex gap-8px max-[520px]:flex-col'>
-            <Input
-              id='browser-customer-id'
-              value={customerId}
-              placeholder='Customer ID or slug'
-              onChange={handleCustomerChange}
-              onPressEnter={() => void loadStatus()}
-            />
-            <Button className='shrink-0' loading={loadingStatus} onClick={() => void loadStatus()}>
-              Load
-            </Button>
+          <div className='flex flex-wrap items-center justify-between gap-10px'>
+            <div className='min-w-0'>
+              <div className='text-13px font-medium leading-20px text-t-primary'>Customer context</div>
+              <div className='mt-2px truncate text-12px leading-18px text-t-secondary'>
+                {customerContext.loading ? 'Loading customer targets...' : selectedCustomerLabel}
+              </div>
+            </div>
+            <div className='flex shrink-0 flex-wrap gap-8px'>
+              <Button
+                loading={customerContext.loading}
+                disabled={actionInFlight}
+                onClick={() => void refreshCustomerTargets()}
+              >
+                Refresh targets
+              </Button>
+              <Button
+                className='shrink-0'
+                loading={loadingStatus || customerContext.loading}
+                disabled={actionInFlight || !customerContext.selectedCustomerId}
+                onClick={() => void loadStatus()}
+              >
+                Load
+              </Button>
+            </div>
           </div>
+          <div className='mt-10px flex flex-wrap gap-8px'>
+            {customerContext.targets.length === 0 ? (
+              <Tag color={customerContext.error ? 'orange' : 'gray'}>
+                {customerContext.error ?? customerContext.summaryText}
+              </Tag>
+            ) : (
+              customerContext.targets.map((target) => (
+                <Button
+                  key={target.customerId}
+                  size='small'
+                  type={target.customerId === customerContext.selectedCustomerId ? 'primary' : 'secondary'}
+                  disabled={actionInFlight}
+                  onClick={() => clearLoadedStatusForTargetChange(target.customerId)}
+                >
+                  {target.displayName}
+                </Button>
+              ))
+            )}
+          </div>
+          <p className='m-0 mt-8px text-12px leading-18px text-t-secondary'>
+            {customerContext.summaryText}. Business Browser stays scoped to the selected customer.
+          </p>
           {browserError ? (
             <p className='m-0 mt-8px text-12px leading-18px text-[rgb(var(--warning-6))]'>{browserError}</p>
           ) : null}
@@ -241,7 +372,7 @@ const BusinessBrowserPage: React.FC = () => {
                   <div className='flex max-w-full flex-wrap justify-end gap-8px'>
                     <Button
                       icon={<Browser theme='outline' size='15' />}
-                      disabled={browserView.routeDenied || !browserView.canLaunch}
+                      disabled={actionInFlight || browserView.routeDenied || !browserView.canLaunch}
                       loading={actionTarget === 'launch'}
                       onClick={() => void runBrowserAction('launch')}
                     >
@@ -250,7 +381,7 @@ const BusinessBrowserPage: React.FC = () => {
                     <Button
                       status='danger'
                       icon={<CloseOne theme='outline' size='15' />}
-                      disabled={browserView.routeDenied || !browserView.canStop}
+                      disabled={actionInFlight || browserView.routeDenied || !browserView.canStop}
                       loading={actionTarget === 'stop'}
                       onClick={() => void runBrowserAction('stop')}
                     >
@@ -272,13 +403,14 @@ const BusinessBrowserPage: React.FC = () => {
                     aria-label='Open URL'
                     value={openUrl}
                     placeholder='https://example.com/work'
+                    disabled={actionInFlight || browserView.routeDenied || !browserView.canOpenUrl}
                     onChange={setOpenUrl}
                     onPressEnter={() => void runBrowserAction('openUrl')}
                   />
                   <Button
                     type='primary'
                     icon={<Open theme='outline' size='15' />}
-                    disabled={browserView.routeDenied || !browserView.canOpenUrl || !openUrl.trim()}
+                    disabled={actionInFlight || browserView.routeDenied || !browserView.canOpenUrl || !openUrl.trim()}
                     loading={actionTarget === 'openUrl'}
                     onClick={() => void runBrowserAction('openUrl')}
                   >
