@@ -3,4 +3,6 @@ export { default as SiderBusinessBrowserEntry } from './SiderBusinessBrowserEntr
 export { default as SiderCompanyBrainEntry } from './SiderCompanyBrainEntry';
 export { default as SiderConnectedAppsEntry } from './SiderConnectedAppsEntry';
 export { default as SiderMissionControlEntry } from './SiderMissionControlEntry';
+export { default as SiderNativeCompanionEntry } from './SiderNativeCompanionEntry';
 export { default as SiderPeopleAccessEntry } from './SiderPeopleAccessEntry';
+export { default as SiderTerminalEntry } from './SiderTerminalEntry';

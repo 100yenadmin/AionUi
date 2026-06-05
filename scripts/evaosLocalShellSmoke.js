@@ -159,6 +159,28 @@ const ROUTE_CHECKS = [
     expected: ['Local Agents', 'No local agents detected'],
     forbidden: ['Root PR #15', 'Stack approval', 'Remote Agents', 'Allow insecure', 'Handshake', 'Connect remote'],
   },
+  {
+    name: 'native-companion-boundary',
+    hash: '/native-companion',
+    title: 'Mac & iPhone',
+    proofStage: PROOF_STAGES.SHELL_SMOKE,
+    settledMarkers: ['Mac & iPhone', 'Native companion boundary', 'evaos-workbench-beta', 'Boundary clean'],
+    loadedStateRequiredMarkers: ['native companion boundary', 'deep-link policy', 'fallback requirement'],
+    expected: [
+      'Mac & iPhone',
+      'Native companion boundary',
+      'Not paired',
+      'Needs permission',
+      'Blocked',
+      'AionUi shell is local trust authority: false',
+      'Renderer receives native secrets: false',
+      'Deep-link scheme: evaos-workbench-beta',
+      'evaos-workbench-beta',
+      'Renderer receives callback secrets: false',
+      'Boundary clean',
+    ],
+    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'access_token', 'refresh_token'],
+  },
 ];
 
 const LOCAL_PRODUCT_ROUTE_CHECKS = [
@@ -326,6 +348,34 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
       'auditable handle',
       'local-fixture:provider_profiles',
       'fixture-audit-providers',
+    ],
+    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
+  },
+  {
+    name: 'approval-center-deny-fixture',
+    hash: '/approval-center',
+    title: 'Approval Center',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Approval Center',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'ops-review@example.test',
+      'fixture-audit-approval-deny',
+    ],
+    loadedStateRequiredMarkers: ['approval request rows', 'deny/approve policy source', 'decision audit id'],
+    action: 'click-approval-center-deny',
+    isolateRendererState: true,
+    expected: [
+      'Approval Center',
+      'Human decisions for risky agent actions',
+      'Acme Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Fixture approval request',
+      'ops-review@example.test',
+      'fixture-dest-email',
+      'Source: local-fixture:approval-center:request:fixture-approval-email-1',
+      'Audit: fixture-audit-approval-request',
+      'Approval denied. openclaw: denied Audit fixture-audit-approval-deny.',
     ],
     forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
   },
@@ -638,6 +688,87 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
       'raw_embedding',
       'raw_prompt',
     ],
+  },
+  {
+    name: 'terminal-loaded-fixture',
+    hash: '/terminal',
+    title: 'Terminal',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Terminal',
+      'Acme Fixture Co',
+      'Customer VM shell is offline in this local fixture',
+      'fixture-audit-runtime-terminal-offline',
+    ],
+    loadedStateRequiredMarkers: ['terminal runtime status', 'terminal source pointer', 'terminal audit id'],
+    action: 'click-load-default-customer',
+    isolateRendererState: true,
+    expected: [
+      'Terminal',
+      'Customer VM shell runtime status from evaOS broker evidence',
+      'Acme Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Customer VM shell is offline in this local fixture',
+      'Source: local-fixture:runtime:terminal-offline',
+      'Audit: fixture-audit-runtime-terminal-offline',
+      'Fail-closed until evaOS broker returns customer-scoped Terminal evidence.',
+    ],
+    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
+  },
+  {
+    name: 'terminal-switch-clears-fixture',
+    hash: '/terminal',
+    title: 'Terminal',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Terminal',
+      'Denied Browser Fixture Co',
+      'Terminal denied for wrong customer fixture',
+      'fixture-audit-runtime-terminal-denied',
+    ],
+    loadedStateRequiredMarkers: ['terminal stale-state clearing', 'terminal denied source pointer'],
+    action: 'click-terminal-switch-clears',
+    isolateRendererState: true,
+    expected: [
+      'Terminal',
+      'Denied Browser Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Terminal denied for wrong customer fixture',
+      'Source: local-fixture:runtime:terminal-denied',
+      'Audit: fixture-audit-runtime-terminal-denied',
+    ],
+    forbidden: [
+      'fixture-audit-runtime-terminal-offline',
+      'local-fixture:runtime:terminal-offline',
+      'desktop_session',
+      'Bearer',
+      'provider_grant',
+      'grant_handle',
+      'access_token',
+      'refresh_token',
+    ],
+  },
+  {
+    name: 'native-companion-boundary-fixture',
+    hash: '/native-companion',
+    title: 'Mac & iPhone',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: ['Mac & iPhone', 'Native companion boundary', 'evaos-workbench-beta', 'Boundary clean'],
+    loadedStateRequiredMarkers: ['native companion boundary', 'deep-link policy', 'fallback requirement'],
+    isolateRendererState: true,
+    expected: [
+      'Mac & iPhone',
+      'Native companion boundary',
+      'Not paired',
+      'Needs permission',
+      'Blocked',
+      'AionUi shell is local trust authority: false',
+      'Renderer receives native secrets: false',
+      'Deep-link scheme: evaos-workbench-beta',
+      'Renderer receives callback secrets: false',
+      'signed beta passes issue #12 packaging, rollback, and support gates',
+    ],
+    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
   },
 ];
 
@@ -965,6 +1096,19 @@ async function clickConnectedAppsSwitchClears(page) {
   );
 }
 
+async function clickApprovalCenterDeny(page) {
+  await clickLoadDefaultCustomer(page);
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-approval-request'), {
+    timeout: 10000,
+  });
+  const denyButton = page.getByRole('button', { name: /^Deny$/ }).first();
+  await denyButton.waitFor({ state: 'visible', timeout: 10000 });
+  await denyButton.click();
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-approval-deny'), {
+    timeout: 10000,
+  });
+}
+
 async function clickBusinessBrowserSwitchClears(page) {
   await clickLoadDefaultCustomer(page);
   await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-browser-running'), {
@@ -977,6 +1121,22 @@ async function clickBusinessBrowserSwitchClears(page) {
   ]);
   await clickLoad(page);
   await page.waitForFunction(() => document.body.innerText.includes('account policy lacks open_business_browser'), {
+    timeout: 10000,
+  });
+}
+
+async function clickTerminalSwitchClears(page) {
+  await clickLoadDefaultCustomer(page);
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-runtime-terminal-offline'), {
+    timeout: 10000,
+  });
+  await clickCustomerTarget(page, 'Denied Browser Fixture Co');
+  await waitForStaleMarkersCleared(page, 'terminal-switch-clears-fixture', [
+    'fixture-audit-runtime-terminal-offline',
+    'local-fixture:runtime:terminal-offline',
+  ]);
+  await clickLoad(page);
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-runtime-terminal-denied'), {
     timeout: 10000,
   });
 }
@@ -1168,38 +1328,55 @@ async function runLocalShellSmoke(options = {}) {
         });
         throw error;
       }
-      if (check.action === 'click-load') {
-        await clickLoad(page);
-      } else if (check.action === 'click-load-default-customer') {
-        await clickLoadDefaultCustomer(page);
-      } else if (check.action === 'click-load-company-brain') {
-        await clickLoadDefaultCustomer(page);
-        await clickFirstCompanyBrainAccount(page);
-        await askCompanyBrainFixtureQuestion(page);
-      } else if (check.action === 'click-business-browser-launch') {
-        await clickBusinessBrowserLaunch(page);
-      } else if (check.action === 'click-business-browser-stop') {
-        await clickBusinessBrowserStop(page);
-      } else if (check.action === 'click-business-browser-denied-customer') {
-        await clickBusinessBrowserDeniedCustomer(page);
-      } else if (check.action === 'click-business-browser-offline-customer') {
-        await clickBusinessBrowserOfflineCustomer(page);
-      } else if (check.action === 'click-business-browser-failed-customer') {
-        await clickBusinessBrowserFailedCustomer(page);
-      } else if (check.action === 'click-mission-control-check') {
-        await clickMissionControlCheck(page);
-      } else if (check.action === 'click-mission-control-switch-clears') {
-        await clickMissionControlSwitchClears(page);
-      } else if (check.action === 'click-people-access-switch-clears') {
-        await clickPeopleAccessSwitchClears(page);
-      } else if (check.action === 'click-connected-apps-switch-clears') {
-        await clickConnectedAppsSwitchClears(page);
-      } else if (check.action === 'click-business-browser-switch-clears') {
-        await clickBusinessBrowserSwitchClears(page);
-      } else if (check.action === 'click-company-brain-switch-clears') {
-        await clickCompanyBrainSwitchClears(page);
-      } else if (check.action === 'click-refresh-targets') {
-        await clickRefreshTargets(page);
+      try {
+        if (check.action === 'click-load') {
+          await clickLoad(page);
+        } else if (check.action === 'click-load-default-customer') {
+          await clickLoadDefaultCustomer(page);
+        } else if (check.action === 'click-load-company-brain') {
+          await clickLoadDefaultCustomer(page);
+          await clickFirstCompanyBrainAccount(page);
+          await askCompanyBrainFixtureQuestion(page);
+        } else if (check.action === 'click-business-browser-launch') {
+          await clickBusinessBrowserLaunch(page);
+        } else if (check.action === 'click-business-browser-stop') {
+          await clickBusinessBrowserStop(page);
+        } else if (check.action === 'click-business-browser-denied-customer') {
+          await clickBusinessBrowserDeniedCustomer(page);
+        } else if (check.action === 'click-business-browser-offline-customer') {
+          await clickBusinessBrowserOfflineCustomer(page);
+        } else if (check.action === 'click-business-browser-failed-customer') {
+          await clickBusinessBrowserFailedCustomer(page);
+        } else if (check.action === 'click-approval-center-deny') {
+          await clickApprovalCenterDeny(page);
+        } else if (check.action === 'click-mission-control-check') {
+          await clickMissionControlCheck(page);
+        } else if (check.action === 'click-mission-control-switch-clears') {
+          await clickMissionControlSwitchClears(page);
+        } else if (check.action === 'click-people-access-switch-clears') {
+          await clickPeopleAccessSwitchClears(page);
+        } else if (check.action === 'click-connected-apps-switch-clears') {
+          await clickConnectedAppsSwitchClears(page);
+        } else if (check.action === 'click-business-browser-switch-clears') {
+          await clickBusinessBrowserSwitchClears(page);
+        } else if (check.action === 'click-terminal-switch-clears') {
+          await clickTerminalSwitchClears(page);
+        } else if (check.action === 'click-company-brain-switch-clears') {
+          await clickCompanyBrainSwitchClears(page);
+        } else if (check.action === 'click-refresh-targets') {
+          await clickRefreshTargets(page);
+        }
+      } catch (error) {
+        const actionText = await bodyText(page, 2500).catch(() => '');
+        const actionPath = path.join(screenshotsDir, `${check.name}-action-failed.png`);
+        await page.screenshot({ path: actionPath, fullPage: true }).catch(() => undefined);
+        throw new Error(
+          `${check.name} action ${check.action ?? 'none'} failed. URL=${page.url()} screenshot=${actionPath} text=${actionText.slice(
+            0,
+            800
+          )}`,
+          { cause: error }
+        );
       }
       await waitForSettledMarkers(page, check.settledMarkers);
       const text = await page.locator('body').innerText({ timeout: 10000 });

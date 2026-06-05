@@ -10,6 +10,11 @@ import type {
   IEvaosBusinessBrowserOpenUrlRequest,
   IEvaosBusinessBrowserRequest,
   IEvaosBusinessBrowserView,
+  IEvaosAccountPolicyScope,
+  IEvaosApprovalCenterRequest,
+  IEvaosApprovalCenterView,
+  IEvaosApprovalDecisionResult,
+  IEvaosApprovalDenyRequest,
   IEvaosRuntimeStatusRequest,
   IEvaosRuntimeStatusView,
   IEvaosSafeUrlSummary,
@@ -40,6 +45,26 @@ const NOW = '2026-06-04T10:00:00.000Z';
 const FIXTURE_LABEL = 'LOCAL FIXTURE - NOT LIVE BETA PROOF';
 type EvaosLocalProductFixturePersona = 'owner' | 'member';
 type EvaosRuntimeFixture = Pick<IEvaosRuntimeStatusView, 'displayLabel' | 'status'> & Partial<IEvaosRuntimeStatusView>;
+const OWNER_FIXTURE_SCOPES: IEvaosAccountPolicyScope[] = [
+  'manage_members',
+  'manage_integrations',
+  'approve_actions',
+  'open_business_browser',
+  'use_creative_studio',
+  'use_design_workspace',
+  'view_company_brain',
+  'manage_company_brain',
+  'assign_agents',
+  'access_openclaw_dashboard',
+  'access_hermes_dashboard',
+  'access_terminal',
+  'access_technical_diagnostics',
+];
+const MEMBER_FIXTURE_SCOPES: IEvaosAccountPolicyScope[] = [
+  'open_business_browser',
+  'use_creative_studio',
+  'use_design_workspace',
+];
 
 export function isEvaosLocalProductFixtureEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AIONUI_E2E_TEST === '1' && env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE === '1';
@@ -68,6 +93,7 @@ export function evaosLocalProductFixtureCustomerTargets(
   const persona = evaosLocalProductFixturePersona(env);
   return clone({
     roles: persona === 'member' ? ['member'] : ['owner'],
+    scopes: persona === 'member' ? MEMBER_FIXTURE_SCOPES : OWNER_FIXTURE_SCOPES,
     isOperator: persona === 'owner',
     defaultCustomerId: CUSTOMER_ID,
     selectedCustomerId: CUSTOMER_ID,
@@ -227,6 +253,62 @@ export function evaosLocalProductFixtureProviderAction(
   });
 }
 
+export function evaosLocalProductFixtureApprovalCenter(request: IEvaosApprovalCenterRequest): IEvaosApprovalCenterView {
+  if (request.customerId !== CUSTOMER_ID) {
+    return clone({
+      schemaVersion: 'evaos.approval_center.v1',
+      customerId: request.customerId,
+      customerAccountId: CUSTOMER_ACCOUNT_ID,
+      membershipId: 'fixture-member-agent',
+      membershipRole: 'agent_only',
+      routeDenied: true,
+      routeDenialReason: `${FIXTURE_LABEL}: Approval Center denied for wrong customer fixture.`,
+      backendEnforced: true,
+      requests: [],
+      summaryText: `${FIXTURE_LABEL}: Approval Center denied by local fixture policy`,
+      sourcePointer: 'local-fixture:approval-center:denied',
+      auditId: undefined,
+      policyAuditId: 'fixture-audit-approval-denied-policy',
+    });
+  }
+
+  return clone(approvalCenter);
+}
+
+export function evaosLocalProductFixtureDenyApproval(request: IEvaosApprovalDenyRequest): IEvaosApprovalDecisionResult {
+  const center = evaosLocalProductFixtureApprovalCenter({ customerId: request.customerId });
+  const approval = center.requests.find((item) => item.approvalId === request.approvalId);
+
+  if (!approval || center.routeDenied) {
+    return clone({
+      status: 'denied',
+      decision: 'deny',
+      scope: 'this-call',
+      approvalId: request.approvalId,
+      sourcePointer: 'local-fixture:approval-center:deny:denied',
+      auditId: 'fixture-audit-approval-deny-denied',
+      backendEnforced: true,
+    });
+  }
+
+  return clone({
+    status: 'denied',
+    decision: 'deny',
+    scope: 'this-call',
+    approvalId: approval.approvalId,
+    request: approval,
+    runtimeResult: {
+      status: 'denied',
+      runtime: 'openclaw',
+      sourcePointer: `local-fixture:approval-center:decision:${approval.approvalId}`,
+      auditId: 'fixture-audit-approval-deny',
+    },
+    sourcePointer: `local-fixture:approval-center:deny:${approval.approvalId}`,
+    auditId: 'fixture-audit-approval-deny',
+    backendEnforced: true,
+  });
+}
+
 export function evaosLocalProductFixtureBusinessBrowserStatus(
   request: IEvaosBusinessBrowserRequest
 ): IEvaosBusinessBrowserView {
@@ -298,6 +380,23 @@ export function evaosLocalProductFixtureRuntimeStatus(request: IEvaosRuntimeStat
       auditId: 'fixture-audit-runtime-terminal-offline',
     },
   };
+
+  if (request.runtime === 'terminal' && request.customerId !== CUSTOMER_ID) {
+    return clone({
+      schemaVersion: 'evaos.runtime_status.v1',
+      customerId: request.customerId,
+      customerAccountId: CUSTOMER_ACCOUNT_ID,
+      runtimeKey: 'terminal',
+      displayLabel: 'Terminal',
+      status: 'denied',
+      healthSummary: `${FIXTURE_LABEL}: Terminal denied for wrong customer fixture.`,
+      owner: 'support',
+      lastCheckedAt: NOW,
+      actions: [],
+      sourcePointer: 'local-fixture:runtime:terminal-denied',
+      auditId: 'fixture-audit-runtime-terminal-denied',
+    });
+  }
 
   const selected: EvaosRuntimeFixture = runtimeByKey[request.runtime] ?? {
     displayLabel: request.runtime,
@@ -712,6 +811,53 @@ const providerHub: IEvaosProviderHubView = {
       summaryText: 'Approval required',
     },
   ],
+};
+
+const approvalCenter: IEvaosApprovalCenterView = {
+  schemaVersion: 'evaos.approval_center.v1',
+  customerId: CUSTOMER_ID,
+  customerAccountId: CUSTOMER_ACCOUNT_ID,
+  membershipId: MEMBERSHIP_ID,
+  membershipRole: 'owner',
+  routeDenied: false,
+  backendEnforced: true,
+  requests: [
+    {
+      approvalId: 'fixture-approval-email-1',
+      ownerId: 'fixture-owner',
+      agentId: 'fixture-agent-email',
+      requesterMembershipId: 'fixture-member-requester',
+      toolName: 'gmail.send',
+      riskClass: 'critical',
+      destinationPreview: {
+        kind: 'email_recipient',
+        primary: 'ops-review@example.test',
+        secondary: 'Fixture approval request',
+        actionable: true,
+      },
+      destinationProof: {
+        kind: 'email_recipient',
+        fingerprint: 'fixture-dest-email',
+        summary: 'email_recipient: ops-review@example.test',
+        source: 'local_fixture',
+        sourcePointer: 'local-fixture:approval-center:destination',
+      },
+      allowAlwaysSupported: true,
+      availableDecisions: ['allow-once', 'allow-always', 'deny'],
+      canAllowOnce: true,
+      canAllowAlways: true,
+      canDeny: true,
+      createdAt: '2026-06-04T09:40:00.000Z',
+      expiresAt: '2026-06-04T10:40:00.000Z',
+      sourcePointer: 'local-fixture:approval-center:request:fixture-approval-email-1',
+      auditId: 'fixture-audit-approval-request',
+      nextAction: 'Critical action. Verify the actual destination before deciding.',
+    },
+  ],
+  summaryText: `${FIXTURE_LABEL}: 1 pending approval request`,
+  sourcePointer: 'local-fixture:approval-center:list',
+  auditId: 'fixture-audit-approval-list',
+  policyAuditId: 'fixture-audit-policy',
 };
 
 function browserView(status: string, overrides: Partial<IEvaosBusinessBrowserView> = {}): IEvaosBusinessBrowserView {

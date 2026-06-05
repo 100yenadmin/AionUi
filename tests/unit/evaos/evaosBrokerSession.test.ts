@@ -437,6 +437,7 @@ describe('EvaosBrokerSessionClient', () => {
       .mockResolvedValueOnce(
         jsonResponse({
           roles: ['admin', 'support'],
+          scopes: ['open_business_browser', 'access_terminal', 'unknown_scope', 'access_token'],
           is_operator: true,
           default_customer_id: 'david-poku',
           customers: [
@@ -479,6 +480,7 @@ describe('EvaosBrokerSessionClient', () => {
     expect(requestBody(fetchImpl.mock.calls[1])).toEqual({ action: 'list_customer_targets' });
     expect(targets).toEqual({
       roles: ['admin', 'support'],
+      scopes: ['open_business_browser', 'access_terminal'],
       isOperator: true,
       defaultCustomerId: 'david-poku',
       customers: [

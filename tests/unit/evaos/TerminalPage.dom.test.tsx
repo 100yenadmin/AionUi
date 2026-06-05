@@ -1,0 +1,171 @@
+/**
+ * @license
+ * Copyright 2025 AionUi (aionui.com)
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { clearEvaosCustomerContext } from '@/renderer/hooks/context/EvaosCustomerContext';
+import TerminalPage from '@/renderer/pages/terminal';
+
+const brokerMocks = vi.hoisted(() => ({
+  getCustomerTargets: vi.fn(),
+  runtimeStatus: vi.fn(),
+}));
+
+vi.mock('@renderer/hooks/context/LayoutContext', () => ({
+  useLayoutContext: () => ({ isMobile: false }),
+}));
+
+vi.mock('@/common/adapter/ipcBridge', () => ({
+  evaosBroker: {
+    getCustomerTargets: {
+      invoke: brokerMocks.getCustomerTargets,
+    },
+    runtimeStatus: {
+      invoke: brokerMocks.runtimeStatus,
+    },
+  },
+}));
+
+function customerTargets() {
+  return {
+    success: true,
+    data: {
+      roles: ['admin'],
+      isOperator: true,
+      defaultCustomerId: 'david-poku',
+      selectedCustomerId: 'david-poku',
+      customers: [
+        {
+          customerId: 'david-poku',
+          displayName: 'David Poku Co',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: true,
+        },
+        {
+          customerId: 'second-customer',
+          displayName: 'Second Customer',
+          status: 'active',
+          healthStatus: 'ready',
+          isDefault: false,
+        },
+      ],
+      summaryText: '2 customer targets loaded',
+    },
+  };
+}
+
+describe('TerminalPage', () => {
+  beforeEach(() => {
+    clearEvaosCustomerContext();
+    brokerMocks.getCustomerTargets.mockReset();
+    brokerMocks.runtimeStatus.mockReset();
+    brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
+  });
+
+  it('loads terminal runtime evidence through the broker and renders no secrets', async () => {
+    const user = userEvent.setup();
+    brokerMocks.runtimeStatus.mockResolvedValue({
+      success: true,
+      data: {
+        schemaVersion: 'evaos.runtime_status.v1',
+        customerId: 'david-poku',
+        customerAccountId: 'acct_terminal',
+        runtimeKey: 'terminal',
+        displayLabel: 'Terminal',
+        status: 'offline',
+        healthSummary: 'Customer VM shell is offline.',
+        owner: 'support',
+        sourcePointer: 'broker://runtime/terminal/audit_123',
+        auditId: 'audit_terminal_123',
+      },
+    });
+
+    const { container } = render(<TerminalPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(await screen.findByText('Customer VM shell is offline.')).toBeInTheDocument();
+    expect(screen.getByTestId('evaos-terminal-status')).toHaveTextContent('broker://runtime/terminal/audit_123');
+    expect(screen.getByTestId('evaos-terminal-status')).toHaveTextContent('audit_terminal_123');
+    await waitFor(() => {
+      expect(brokerMocks.runtimeStatus).toHaveBeenCalledWith({ customerId: 'david-poku', runtime: 'terminal' });
+    });
+    expect(container.textContent).not.toMatch(/eds_|epg_|access_token|desktop_session|provider_grant|Bearer/i);
+  });
+
+  it('clears stale terminal evidence when customer context changes', async () => {
+    const user = userEvent.setup();
+    brokerMocks.runtimeStatus
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          schemaVersion: 'evaos.runtime_status.v1',
+          customerId: 'david-poku',
+          runtimeKey: 'terminal',
+          displayLabel: 'Terminal',
+          status: 'offline',
+          healthSummary: 'First terminal evidence',
+          sourcePointer: 'broker://runtime/terminal/first',
+          auditId: 'audit_first',
+        },
+      })
+      .mockResolvedValueOnce({
+        success: true,
+        data: {
+          schemaVersion: 'evaos.runtime_status.v1',
+          customerId: 'second-customer',
+          runtimeKey: 'terminal',
+          displayLabel: 'Terminal',
+          status: 'denied',
+          healthSummary: 'Second terminal denied',
+          sourcePointer: 'broker://runtime/terminal/second',
+          auditId: 'audit_second',
+        },
+      });
+
+    render(<TerminalPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('First terminal evidence')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^Second Customer$/ }));
+    expect(screen.queryByText('First terminal evidence')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+    expect(await screen.findByText('Second terminal denied')).toBeInTheDocument();
+    expect(screen.queryByText('broker://runtime/terminal/first')).not.toBeInTheDocument();
+  });
+
+  it('fails closed when the broker returns mismatched runtime evidence', async () => {
+    const user = userEvent.setup();
+    brokerMocks.runtimeStatus.mockResolvedValue({
+      success: true,
+      data: {
+        customerId: 'david-poku',
+        runtimeKey: 'browser',
+        displayLabel: 'Browser',
+        status: 'running',
+      },
+    });
+
+    render(<TerminalPage />);
+
+    expect((await screen.findAllByText('David Poku Co')).length).toBeGreaterThan(0);
+    await user.click(screen.getByRole('button', { name: /^load$/i }));
+
+    expect(
+      await screen.findByText('Terminal broker returned evidence for a different runtime or customer.')
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText('Fail-closed until evaOS broker returns customer-scoped Terminal evidence.')
+    ).toBeInTheDocument();
+  });
+});

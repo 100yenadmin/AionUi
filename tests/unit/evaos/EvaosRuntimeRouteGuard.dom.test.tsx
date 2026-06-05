@@ -9,6 +9,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EvaosRuntimeRouteGuard } from '@/renderer/components/layout/EvaosRuntimeRouteGuard';
+import type { IEvaosBrokerSessionStatus } from '@/common/evaos/bridgeTypes';
 
 const authMock = vi.hoisted(() => ({
   status: 'authenticated' as 'checking' | 'authenticated' | 'unauthenticated',
@@ -17,6 +18,7 @@ const authMock = vi.hoisted(() => ({
 
 const customerContextMock = vi.hoisted(() => ({
   roles: [] as string[],
+  scopes: [] as string[],
   isOperator: false,
   loaded: true,
   loading: false,
@@ -35,7 +37,7 @@ const brokerSessionMock = vi.hoisted(() => ({
     expiresAt: '2026-06-05T12:00:00.000Z',
     source: 'callback' as const,
     message: 'Session active',
-  },
+  } as IEvaosBrokerSessionStatus,
 }));
 
 vi.mock('@/renderer/hooks/context/AuthContext', () => ({
@@ -62,15 +64,23 @@ vi.mock('@renderer/hooks/useEvaosBrokerSessionStatus', () => ({
       : undefined,
 }));
 
-function renderGuardedMissionControl() {
+function renderGuardedRoute(routePath = '/mission-control') {
   return render(
-    <MemoryRouter initialEntries={['/mission-control']}>
+    <MemoryRouter initialEntries={[routePath]}>
       <Routes>
         <Route
           path='/mission-control'
           element={
             <EvaosRuntimeRouteGuard routePath='/mission-control'>
               <p>Mission Control loaded</p>
+            </EvaosRuntimeRouteGuard>
+          }
+        />
+        <Route
+          path='/terminal'
+          element={
+            <EvaosRuntimeRouteGuard routePath='/terminal'>
+              <p>Terminal loaded</p>
             </EvaosRuntimeRouteGuard>
           }
         />
@@ -86,6 +96,7 @@ describe('EvaosRuntimeRouteGuard', () => {
     authMock.status = 'authenticated';
     authMock.user = null;
     customerContextMock.roles = [];
+    customerContextMock.scopes = [];
     customerContextMock.isOperator = false;
     customerContextMock.loaded = true;
     customerContextMock.loading = false;
@@ -99,6 +110,7 @@ describe('EvaosRuntimeRouteGuard', () => {
       refreshTargets: vi.fn(),
       selectCustomer: vi.fn(),
       roles: customerContextMock.roles,
+      scopes: customerContextMock.scopes,
       isOperator: customerContextMock.isOperator,
       loaded: customerContextMock.loaded,
       loading: customerContextMock.loading,
@@ -120,7 +132,7 @@ describe('EvaosRuntimeRouteGuard', () => {
   it('renders admin-only runtime routes for owner sessions', () => {
     customerContextMock.roles = ['owner'];
 
-    renderGuardedMissionControl();
+    renderGuardedRoute();
 
     expect(screen.getByText('Mission Control loaded')).toBeInTheDocument();
   });
@@ -129,7 +141,7 @@ describe('EvaosRuntimeRouteGuard', () => {
     authMock.user = null;
     customerContextMock.roles = ['owner'];
 
-    renderGuardedMissionControl();
+    renderGuardedRoute();
 
     expect(customerContextMock.useEvaosCustomerContext).toHaveBeenCalledWith(
       true,
@@ -141,7 +153,7 @@ describe('EvaosRuntimeRouteGuard', () => {
     customerContextMock.loaded = false;
     customerContextMock.loading = true;
 
-    renderGuardedMissionControl();
+    renderGuardedRoute();
 
     expect(screen.getByText('Mission Control loaded')).toBeInTheDocument();
   });
@@ -153,19 +165,69 @@ describe('EvaosRuntimeRouteGuard', () => {
       userEmail: 'member@example.test',
     };
 
-    renderGuardedMissionControl();
+    renderGuardedRoute();
 
     await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
     expect(screen.queryByText('Mission Control loaded')).not.toBeInTheDocument();
+  });
+
+  it('fails closed for member sessions that deep-link into Terminal', async () => {
+    customerContextMock.roles = ['member'];
+    brokerSessionMock.session = {
+      ...brokerSessionMock.session,
+      userEmail: 'member@example.test',
+    };
+
+    renderGuardedRoute('/terminal');
+
+    await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
+    expect(screen.queryByText('Terminal loaded')).not.toBeInTheDocument();
   });
 
   it('fails closed to login before the desktop/web session is authenticated', async () => {
     authMock.status = 'unauthenticated';
     customerContextMock.roles = ['owner'];
 
-    renderGuardedMissionControl();
+    renderGuardedRoute();
 
     await waitFor(() => expect(screen.getByText('Login fallback')).toBeInTheDocument());
     expect(screen.queryByText('Mission Control loaded')).not.toBeInTheDocument();
+  });
+
+  it('renders Terminal for admin sessions with terminal scope', () => {
+    customerContextMock.roles = ['owner'];
+    customerContextMock.useEvaosCustomerContext.mockImplementation(() => ({
+      targets: [],
+      selectedCustomerId: undefined,
+      selectedTarget: undefined,
+      summaryText: 'test customer context',
+      refreshTargets: vi.fn(),
+      selectCustomer: vi.fn(),
+      roles: customerContextMock.roles,
+      isOperator: customerContextMock.isOperator,
+      loaded: customerContextMock.loaded,
+      loading: customerContextMock.loading,
+      error: customerContextMock.error,
+      scopes: ['access_terminal'],
+    }));
+
+    renderGuardedRoute('/terminal');
+
+    expect(screen.getByText('Terminal loaded')).toBeInTheDocument();
+  });
+
+  it('fails closed for Terminal when the broker session is missing', async () => {
+    brokerSessionMock.session = {
+      state: 'missing',
+      authenticated: false,
+      expired: false,
+      source: 'none',
+      message: 'Sign in required',
+    };
+
+    renderGuardedRoute('/terminal');
+
+    await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
+    expect(screen.queryByText('Terminal loaded')).not.toBeInTheDocument();
   });
 });

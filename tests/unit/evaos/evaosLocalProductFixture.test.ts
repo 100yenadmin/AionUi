@@ -10,10 +10,12 @@ import { describe, expect, it } from 'vitest';
 import {
   evaosLocalProductFixtureBusinessBrowserAction,
   evaosLocalProductFixtureBusinessBrowserStatus,
+  evaosLocalProductFixtureApprovalCenter,
   evaosLocalProductFixtureCompanyBrainAccount360,
   evaosLocalProductFixtureCompanyBrainDirectory,
   evaosLocalProductFixtureCompanyBrainQuery,
   evaosLocalProductFixtureCustomerTargets,
+  evaosLocalProductFixtureDenyApproval,
   evaosLocalProductFixturePersona,
   evaosLocalProductFixtureProviderAction,
   evaosLocalProductFixtureProviderHub,
@@ -191,6 +193,10 @@ describe('evaOS local product fixture', () => {
       customerId: 'fixture-customer-acme',
       runtime: 'terminal',
     });
+    const deniedTerminal = evaosLocalProductFixtureRuntimeStatus({
+      customerId: 'fixture-customer-browser-denied',
+      runtime: 'terminal',
+    });
     const deniedBrowser = evaosLocalProductFixtureRuntimeStatus({
       customerId: 'fixture-customer-browser-denied',
       runtime: 'browser',
@@ -211,15 +217,57 @@ describe('evaOS local product fixture', () => {
     expect(hermes.status).toBe('done');
     expect(paperclip.status).toBe('waiting');
     expect(terminal.status).toBe('offline');
+    expect(deniedTerminal).toMatchObject({
+      runtimeKey: 'terminal',
+      status: 'denied',
+      sourcePointer: 'local-fixture:runtime:terminal-denied',
+      auditId: 'fixture-audit-runtime-terminal-denied',
+    });
     expect(deniedBrowser).toMatchObject({
       runtimeKey: 'browser',
       status: 'denied',
       sourcePointer: 'local-fixture:business-browser:denied',
       auditId: 'fixture-audit-browser-denied-policy',
     });
-    expect(stringValues({ browser, openclaw, hermes, paperclip, terminal, deniedBrowser }).join('\n')).not.toMatch(
-      SECRET_PATTERN
-    );
+    expect(
+      stringValues({ browser, openclaw, hermes, paperclip, terminal, deniedTerminal, deniedBrowser }).join('\n')
+    ).not.toMatch(SECRET_PATTERN);
+  });
+
+  it('provides Approval Center request and deny-loop fixture evidence without secrets', () => {
+    const center = evaosLocalProductFixtureApprovalCenter({ customerId: 'fixture-customer-acme' });
+    const deniedCenter = evaosLocalProductFixtureApprovalCenter({ customerId: 'wrong-customer' });
+    const decision = evaosLocalProductFixtureDenyApproval({
+      customerId: 'fixture-customer-acme',
+      approvalId: 'fixture-approval-email-1',
+      reason: 'test deny',
+    });
+
+    expect(center).toMatchObject({
+      routeDenied: false,
+      backendEnforced: true,
+      summaryText: expect.stringContaining('LOCAL FIXTURE - NOT LIVE BETA PROOF'),
+      sourcePointer: 'local-fixture:approval-center:list',
+      auditId: 'fixture-audit-approval-list',
+    });
+    expect(center.requests[0]).toMatchObject({
+      approvalId: 'fixture-approval-email-1',
+      toolName: 'gmail.send',
+      canDeny: true,
+      auditId: 'fixture-audit-approval-request',
+      sourcePointer: 'local-fixture:approval-center:request:fixture-approval-email-1',
+    });
+    expect(deniedCenter.routeDenied).toBe(true);
+    expect(deniedCenter.routeDenialReason).toContain('wrong customer fixture');
+    expect(decision).toMatchObject({
+      status: 'denied',
+      decision: 'deny',
+      approvalId: 'fixture-approval-email-1',
+      sourcePointer: 'local-fixture:approval-center:deny:fixture-approval-email-1',
+      auditId: 'fixture-audit-approval-deny',
+      backendEnforced: true,
+    });
+    expect(stringValues({ center, deniedCenter, decision }).join('\n')).not.toMatch(SECRET_PATTERN);
   });
 
   it('fails Business Browser closed for denied and wrong customer fixture paths', () => {

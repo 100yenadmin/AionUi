@@ -48,6 +48,7 @@ export interface IEvaosCustomerTargetView {
 
 export interface IEvaosCustomerTargetsView {
   roles: string[];
+  scopes: IEvaosAccountPolicyScope[];
   isOperator: boolean;
   defaultCustomerId?: string;
   selectedCustomerId?: string;

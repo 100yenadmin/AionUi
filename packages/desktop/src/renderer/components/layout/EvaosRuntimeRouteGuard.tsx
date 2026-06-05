@@ -60,6 +60,7 @@ export const EvaosRuntimeRouteGuard: React.FC<EvaosRuntimeRouteGuardProps> = ({ 
   const decision = evaosRuntimeRouteDecision(routePath, {
     authenticated,
     roles: customerContext.roles,
+    scopes: customerContext.scopes,
     isOperator: customerContext.isOperator,
     userEmail: brokerSessionStatus.session?.userEmail ?? user?.username,
   });

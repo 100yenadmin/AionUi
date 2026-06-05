@@ -6,14 +6,35 @@
 
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import { evaosBroker } from '@/common/adapter/ipcBridge';
-import type { IEvaosCustomerTargetView, IEvaosCustomerTargetsView } from '@/common/evaos/bridgeTypes';
+import type {
+  IEvaosAccountPolicyScope,
+  IEvaosCustomerTargetView,
+  IEvaosCustomerTargetsView,
+} from '@/common/evaos/bridgeTypes';
 
 const SECRET_TEXT_PATTERN =
   /\b(?:eds|epg)_[A-Za-z0-9_-]{4,}\b|access[_-]?token|refresh[_-]?token|desktop[_-]?session|provider[_-]?grant|authorization|bearer|secret|password/i;
+const ACCOUNT_POLICY_SCOPES = new Set<IEvaosAccountPolicyScope>([
+  'manage_members',
+  'manage_billing',
+  'manage_integrations',
+  'approve_actions',
+  'open_business_browser',
+  'use_creative_studio',
+  'use_design_workspace',
+  'view_company_brain',
+  'manage_company_brain',
+  'assign_agents',
+  'access_openclaw_dashboard',
+  'access_hermes_dashboard',
+  'access_terminal',
+  'access_technical_diagnostics',
+]);
 
 type EvaosCustomerContextState = {
   targets: IEvaosCustomerTargetView[];
   roles: string[];
+  scopes: IEvaosAccountPolicyScope[];
   isOperator: boolean;
   selectedCustomerId?: string;
   summaryText: string;
@@ -25,6 +46,7 @@ type EvaosCustomerContextState = {
 const EMPTY_STATE: EvaosCustomerContextState = {
   targets: [],
   roles: [],
+  scopes: [],
   isOperator: false,
   selectedCustomerId: undefined,
   summaryText: 'No customer targets loaded',
@@ -74,6 +96,12 @@ function safeRoleList(value: unknown): string[] {
     .map((item) => safeOptionalUiText(item))
     .filter((item): item is string => Boolean(item))
     .map((item) => item.slice(0, 80));
+}
+
+function safeScopeList(value: unknown): IEvaosAccountPolicyScope[] {
+  return safeRoleList(value)
+    .map((item) => item.replace(/-/g, '_'))
+    .filter((item): item is IEvaosAccountPolicyScope => ACCOUNT_POLICY_SCOPES.has(item as IEvaosAccountPolicyScope));
 }
 
 function customerTargetsSummary(count: number): string {
@@ -157,6 +185,7 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
     emit({
       targets: sanitizedView.customers,
       roles: safeRoleList(sanitizedView.roles),
+      scopes: safeScopeList(sanitizedView.scopes),
       isOperator: sanitizedView.isOperator === true,
       selectedCustomerId: chooseSelectedCustomer(sanitizedView),
       summaryText: sanitizedView.summaryText,

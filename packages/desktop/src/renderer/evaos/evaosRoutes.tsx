@@ -20,7 +20,9 @@ const BusinessBrowser = React.lazy(() => import('@renderer/pages/business-browse
 const CompanyBrain = React.lazy(() => import('@renderer/pages/company-brain'));
 const ConnectedApps = React.lazy(() => import('@renderer/pages/connected-apps'));
 const MissionControl = React.lazy(() => import('@renderer/pages/mission-control'));
+const NativeCompanion = React.lazy(() => import('@renderer/pages/native-companion'));
 const PeopleAccess = React.lazy(() => import('@renderer/pages/people-access'));
+const Terminal = React.lazy(() => import('@renderer/pages/terminal'));
 
 const withRouteFallback = (Component: React.LazyExoticComponent<React.ComponentType>) => (
   <Suspense fallback={<AppLoader />}>
@@ -36,6 +38,8 @@ export function renderEvaosRoutes(): React.ReactNode {
   return (
     <>
       <Route path='/mission-control' element={withEvaosRuntimeRouteGuard('/mission-control', MissionControl)} />
+      <Route path='/terminal' element={withEvaosRuntimeRouteGuard('/terminal', Terminal)} />
+      <Route path='/native-companion' element={withRouteFallback(NativeCompanion)} />
       <Route
         path='/approval-center'
         element={EVAOS_APPROVAL_CENTER_ENABLED ? withRouteFallback(ApprovalCenter) : <Navigate to='/guid' replace />}
