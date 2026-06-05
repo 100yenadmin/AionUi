@@ -14,8 +14,10 @@ import {
   evaosLocalProductFixtureCompanyBrainDirectory,
   evaosLocalProductFixtureCompanyBrainQuery,
   evaosLocalProductFixtureCustomerTargets,
+  evaosLocalProductFixturePersona,
   evaosLocalProductFixtureProviderAction,
   evaosLocalProductFixtureProviderHub,
+  evaosLocalProductFixtureSessionStatus,
   isEvaosLocalProductFixtureEnabled,
 } from '@/process/services/evaosLocalProductFixture';
 
@@ -61,6 +63,25 @@ describe('evaOS local product fixture', () => {
       hasBrokeredGrant: true,
     });
     expect(stringValues({ customers, hub }).join('\n')).not.toMatch(SECRET_PATTERN);
+  });
+
+  it('supports an explicit member persona for local route-visibility proof', () => {
+    const env = { AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE_PERSONA: 'member' };
+    const session = evaosLocalProductFixtureSessionStatus(env);
+    const customers = evaosLocalProductFixtureCustomerTargets(env);
+
+    expect(evaosLocalProductFixturePersona({})).toBe('owner');
+    expect(evaosLocalProductFixturePersona(env)).toBe('member');
+    expect(session).toMatchObject({
+      state: 'authenticated',
+      authenticated: true,
+      userEmail: 'member@example.test',
+      source: 'memory',
+    });
+    expect(customers.roles).toEqual(['member']);
+    expect(customers.isOperator).toBe(false);
+    expect(customers.summaryText).toContain('member persona');
+    expect(stringValues({ session, customers }).join('\n')).not.toMatch(SECRET_PATTERN);
   });
 
   it('fails closed for a customer outside the local fixture', () => {

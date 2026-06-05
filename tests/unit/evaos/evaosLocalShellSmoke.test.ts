@@ -40,6 +40,16 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     action?: string;
     isolateRendererState?: boolean;
   }>;
+  LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS: Array<{
+    name: string;
+    hash: string;
+    title: string;
+    expected: string[];
+    forbidden: string[];
+    proofStage: string;
+    settledMarkers: string[];
+    loadedStateRequiredMarkers: string[];
+  }>;
   TEAM_ROUTE_CHECK: {
     name: string;
     hash: string;
@@ -61,6 +71,7 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     isolateRendererState?: boolean;
   }>;
   shellSmokeEnv: (artifactsDir: string, env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  isLocalProductMemberPersona: (env?: NodeJS.ProcessEnv) => boolean;
   textFindings: (
     route: string,
     text: string,
@@ -210,6 +221,28 @@ describe('evaOS local shell smoke', () => {
     expect(localShellSmoke.routeChecksForEnv({ AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE: '1' })).toBe(
       localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS
     );
+    expect(
+      localShellSmoke.routeChecksForEnv({
+        AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE: '1',
+        AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE_PERSONA: 'member',
+      })
+    ).toBe(localShellSmoke.LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS);
+  });
+
+  it('keeps member-persona visual proof focused on route denial instead of product readiness', () => {
+    expect(localShellSmoke.isLocalProductMemberPersona({})).toBe(false);
+    expect(localShellSmoke.isLocalProductMemberPersona({ AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE_PERSONA: 'member' })).toBe(
+      true
+    );
+    expect(localShellSmoke.LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS).toEqual([
+      expect.objectContaining({
+        name: 'mission-control-member-denied-fixture',
+        hash: '/mission-control',
+        proofStage: localShellSmoke.PROOF_STAGES.SHELL_SMOKE,
+        expected: ['evaOS Workbench Beta'],
+        forbidden: expect.arrayContaining(['Mission Control', 'Terminal', 'Eva Workspace', 'Agent Workspace']),
+      }),
+    ]);
   });
 
   it('keeps future loaded-state proof markers distinct from title-only waits', () => {
@@ -330,6 +363,8 @@ describe('evaOS local shell smoke', () => {
       localShellSmoke.relevantConsoleErrors([
         { type: 'error', text: '[useCronJobsMap] Failed to fetch jobs' },
         { type: 'error', text: 'Failed to initialize config: TypeError: Failed to fetch' },
+        { type: 'error', text: 'Failed to load assistants: TypeError: Failed to fetch' },
+        { type: 'error', text: '[GuidPage] Failed to load MCP catalog: TypeError: Failed to fetch' },
         { type: 'debug', text: 'debug line' },
         { type: 'error', text: 'Unhandled route exception' },
       ])

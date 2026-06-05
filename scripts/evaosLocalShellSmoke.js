@@ -351,6 +351,19 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
   },
 ];
 
+const LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS = [
+  {
+    name: 'mission-control-member-denied-fixture',
+    hash: '/mission-control',
+    title: 'evaOS Workbench Beta',
+    proofStage: PROOF_STAGES.SHELL_SMOKE,
+    settledMarkers: ['evaOS Workbench Beta'],
+    loadedStateRequiredMarkers: ['redirected #/guid route', 'admin runtime hidden from member persona'],
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['Mission Control', 'Terminal', 'Eva Workspace', 'Agent Workspace'],
+  },
+];
+
 const TEAM_ROUTE_CHECK = {
   name: 'team-route-redirect',
   hash: '/team/local-smoke',
@@ -373,7 +386,7 @@ const GLOBAL_FORBIDDEN_PATTERNS = [
 ];
 
 const IGNORED_CONSOLE_ERROR_PATTERN =
-  /autofill|Failed to load resource: net::ERR_FILE_NOT_FOUND|Failed to load initial theme|Failed to load initial color scheme|Failed to initialize language|Failed to initialize config|\[useExtensionSettingsTabs\] Failed to load tabs|\[useExtI18n\] Failed to load ext i18n|\[useCronJobsMap\] Failed to fetch jobs/;
+  /autofill|Failed to load resource: net::ERR_FILE_NOT_FOUND|Failed to load initial theme|Failed to load initial color scheme|Failed to initialize language|Failed to initialize config|Failed to load assistants|\[GuidPage\] Failed to load MCP catalog|\[useExtensionSettingsTabs\] Failed to load tabs|\[useExtI18n\] Failed to load ext i18n|\[useCronJobsMap\] Failed to fetch jobs/;
 
 function ensureDirs(artifactRoot) {
   const screenshotsDir = path.join(artifactRoot, 'screenshots');
@@ -401,7 +414,14 @@ function isLocalProductFixtureMode(env = process.env) {
   return env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE === '1';
 }
 
+function isLocalProductMemberPersona(env = process.env) {
+  return env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE_PERSONA === 'member';
+}
+
 function routeChecksForEnv(env = process.env) {
+  if (isLocalProductFixtureMode(env) && isLocalProductMemberPersona(env)) {
+    return LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS;
+  }
   return isLocalProductFixtureMode(env) ? LOCAL_PRODUCT_ROUTE_CHECKS : ROUTE_CHECKS;
 }
 
@@ -694,7 +714,7 @@ async function runLocalShellSmoke(options = {}) {
     });
 
     await navigate(page, '/mission-control');
-    await waitForRoute(page, 'Mission Control');
+    await waitForRoute(page, routeChecks[0]?.title || 'Mission Control');
 
     for (const check of routeChecks) {
       console.log(`[evaos-local-shell-smoke] route ${check.name} -> #${check.hash}`);
@@ -811,11 +831,13 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_ARTIFACT_ROOT,
   GLOBAL_FORBIDDEN_PATTERNS,
+  LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS,
   LOCAL_PRODUCT_ROUTE_CHECKS,
   PROOF_STAGES,
   ROUTE_CHECKS,
   TEAM_ROUTE_CHECK,
   isLocalProductFixtureMode,
+  isLocalProductMemberPersona,
   loadPlaywrightElectron,
   relevantConsoleErrors,
   routeChecksForEnv,
