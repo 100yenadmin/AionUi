@@ -118,7 +118,10 @@ describe('evaOS local shell smoke', () => {
       'business-browser-launch-fixture',
       'business-browser-stop-fixture',
       'business-browser-denied-fixture',
+      'connected-apps-switch-clears-fixture',
+      'business-browser-switch-clears-fixture',
       'company-brain-loaded-fixture',
+      'company-brain-switch-clears-fixture',
     ]);
 
     const connectedAppsLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS[0];
@@ -178,9 +181,11 @@ describe('evaOS local shell smoke', () => {
       ])
     );
 
-    const businessBrowserDenied = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS[4];
-    expect(businessBrowserDenied.action).toBe('click-business-browser-denied-customer');
-    expect(businessBrowserDenied.expected).toEqual(
+    const businessBrowserDenied = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'business-browser-denied-fixture'
+    );
+    expect(businessBrowserDenied?.action).toBe('click-business-browser-denied-customer');
+    expect(businessBrowserDenied?.expected).toEqual(
       expect.arrayContaining([
         'Denied Browser Fixture Co',
         'Route denied',
@@ -190,10 +195,34 @@ describe('evaOS local shell smoke', () => {
       ])
     );
 
-    const companyBrainLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS[5];
-    expect(companyBrainLoaded.proofStage).toBe(localShellSmoke.PROOF_STAGES.PRODUCT_LOADED_STATE);
-    expect(companyBrainLoaded.action).toBe('click-load-company-brain');
-    expect(companyBrainLoaded.expected).toEqual(
+    const connectedAppsSwitch = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'connected-apps-switch-clears-fixture'
+    );
+    expect(connectedAppsSwitch).toEqual(
+      expect.objectContaining({
+        action: 'click-connected-apps-switch-clears',
+        loadedStateRequiredMarkers: ['provider stale-state clearing', 'provider denied source pointer'],
+        forbidden: expect.arrayContaining(['fixture-audit-providers', 'local-fixture:provider:google_workspace']),
+      })
+    );
+
+    const businessBrowserSwitch = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'business-browser-switch-clears-fixture'
+    );
+    expect(businessBrowserSwitch).toEqual(
+      expect.objectContaining({
+        action: 'click-business-browser-switch-clears',
+        loadedStateRequiredMarkers: ['browser stale-state clearing', 'browser denied source pointer'],
+        forbidden: expect.arrayContaining(['fixture-audit-browser-running', 'fixture.example.test/dashboard']),
+      })
+    );
+
+    const companyBrainLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'company-brain-loaded-fixture'
+    );
+    expect(companyBrainLoaded?.proofStage).toBe(localShellSmoke.PROOF_STAGES.PRODUCT_LOADED_STATE);
+    expect(companyBrainLoaded?.action).toBe('click-load-company-brain');
+    expect(companyBrainLoaded?.expected).toEqual(
       expect.arrayContaining([
         'LOCAL FIXTURE - NOT LIVE BETA PROOF',
         'Northstar Fixture Account',
@@ -208,12 +237,27 @@ describe('evaOS local shell smoke', () => {
         'fixture-audit-company-directory',
       ])
     );
-    expect(companyBrainLoaded.loadedStateRequiredMarkers).toEqual([
+    expect(companyBrainLoaded?.loadedStateRequiredMarkers).toEqual([
       'account directory rows',
       'account 360 panel',
       'query answer source pointer',
       'directory source pointer',
     ]);
+
+    const companyBrainSwitch = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'company-brain-switch-clears-fixture'
+    );
+    expect(companyBrainSwitch).toEqual(
+      expect.objectContaining({
+        action: 'click-company-brain-switch-clears',
+        loadedStateRequiredMarkers: ['company-brain stale-state clearing', 'company-brain denied source pointer'],
+        forbidden: expect.arrayContaining([
+          'Northstar Fixture Account',
+          'Renewal fixture brief',
+          'fixture-audit-company-directory',
+        ]),
+      })
+    );
   });
 
   it('selects loaded product checks only when local fixture mode is explicitly enabled', () => {

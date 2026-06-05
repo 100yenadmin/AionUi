@@ -300,6 +300,76 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
     forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle', 'access_token', 'refresh_token'],
   },
   {
+    name: 'connected-apps-switch-clears-fixture',
+    hash: '/connected-apps',
+    title: 'Connected Apps',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Connected Apps',
+      'Denied Browser Fixture Co',
+      'Connected Apps denied for wrong customer fixture',
+      'fixture-audit-provider-denied',
+    ],
+    loadedStateRequiredMarkers: ['provider stale-state clearing', 'provider denied source pointer'],
+    action: 'click-connected-apps-switch-clears',
+    isolateRendererState: true,
+    expected: [
+      'Connected Apps',
+      'Denied Browser Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Connected Apps denied for wrong customer fixture',
+      'Route denied',
+      'Source: local-fixture:provider_profiles:denied',
+      'fixture-audit-provider-denied',
+    ],
+    forbidden: [
+      'fixture-audit-providers',
+      'local-fixture:provider:google_workspace',
+      'workspace@example.test',
+      'desktop_session',
+      'Bearer',
+      'provider_grant',
+      'grant_handle',
+      'access_token',
+      'refresh_token',
+    ],
+  },
+  {
+    name: 'business-browser-switch-clears-fixture',
+    hash: '/business-browser',
+    title: 'Business Browser',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Business Browser',
+      'Denied Browser Fixture Co',
+      'Route denied',
+      'account policy lacks open_business_browser',
+      'fixture-audit-browser-denied-policy',
+    ],
+    loadedStateRequiredMarkers: ['browser stale-state clearing', 'browser denied source pointer'],
+    action: 'click-business-browser-switch-clears',
+    isolateRendererState: true,
+    expected: [
+      'Business Browser',
+      'Denied Browser Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Route denied',
+      'account policy lacks open_business_browser',
+      'Source: local-fixture:business-browser:denied',
+      'fixture-audit-browser-denied-policy',
+    ],
+    forbidden: [
+      'fixture-audit-browser-running',
+      'fixture.example.test/dashboard',
+      'desktop_session',
+      'Bearer',
+      'provider_grant',
+      'grant_handle',
+      'access_token',
+      'refresh_token',
+    ],
+  },
+  {
     name: 'company-brain-loaded-fixture',
     hash: '/company-brain',
     title: 'Company Brain',
@@ -339,6 +409,44 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
       'fixture-audit-policy',
     ],
     forbidden: [
+      'desktop_session',
+      'Bearer',
+      'provider_grant',
+      'grant_handle',
+      'access_token',
+      'refresh_token',
+      'raw_embedding',
+      'raw_prompt',
+    ],
+  },
+  {
+    name: 'company-brain-switch-clears-fixture',
+    hash: '/company-brain',
+    title: 'Company Brain',
+    proofStage: PROOF_STAGES.PRODUCT_LOADED_STATE,
+    settledMarkers: [
+      'Company Brain',
+      'Denied Browser Fixture Co',
+      'Company Brain denied for wrong customer fixture',
+      'fixture-audit-company-denied',
+    ],
+    loadedStateRequiredMarkers: ['company-brain stale-state clearing', 'company-brain denied source pointer'],
+    action: 'click-company-brain-switch-clears',
+    isolateRendererState: true,
+    expected: [
+      'Company Brain',
+      'Denied Browser Fixture Co',
+      'LOCAL FIXTURE - NOT LIVE BETA PROOF',
+      'Company Brain denied for wrong customer fixture',
+      'Route denied',
+      'Source local-fixture:company-brain:denied',
+      'fixture-audit-company-denied',
+    ],
+    forbidden: [
+      'Northstar Fixture Account',
+      'Renewal fixture brief',
+      'fixture-audit-company-directory',
+      'local-fixture:company-brain:query:fixture-company-renewal',
       'desktop_session',
       'Bearer',
       'provider_grant',
@@ -568,6 +676,81 @@ async function clickBusinessBrowserDeniedCustomer(page) {
   });
 }
 
+async function clickCustomerTarget(page, name) {
+  const customerButton = page.getByRole('button', { name: new RegExp(`^${name}$`) }).first();
+  await customerButton.waitFor({ state: 'visible', timeout: 10000 });
+  await customerButton.click();
+  await page.waitForTimeout(250);
+}
+
+async function waitForStaleMarkersCleared(page, route, staleMarkers) {
+  try {
+    await page.waitForFunction(
+      (markers) => markers.every((marker) => !document.body.innerText.includes(marker)),
+      staleMarkers,
+      { timeout: 10000 }
+    );
+  } catch (error) {
+    const text = await bodyText(page, 2000);
+    const visibleMarkers = staleMarkers.filter((marker) => text.includes(marker));
+    throw new Error(`${route} did not clear stale customer evidence: ${visibleMarkers.join(', ')}`);
+  }
+}
+
+async function clickConnectedAppsSwitchClears(page) {
+  await clickLoad(page);
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-providers'), { timeout: 10000 });
+  await clickCustomerTarget(page, 'Denied Browser Fixture Co');
+  await waitForStaleMarkersCleared(page, 'connected-apps-switch-clears-fixture', [
+    'fixture-audit-providers',
+    'local-fixture:provider:google_workspace',
+    'workspace@example.test',
+  ]);
+  await clickLoad(page);
+  await page.waitForFunction(
+    () => document.body.innerText.includes('Connected Apps denied for wrong customer fixture'),
+    {
+      timeout: 10000,
+    }
+  );
+}
+
+async function clickBusinessBrowserSwitchClears(page) {
+  await clickLoad(page);
+  await page.waitForFunction(() => document.body.innerText.includes('fixture-audit-browser-running'), {
+    timeout: 10000,
+  });
+  await clickCustomerTarget(page, 'Denied Browser Fixture Co');
+  await waitForStaleMarkersCleared(page, 'business-browser-switch-clears-fixture', [
+    'fixture-audit-browser-running',
+    'fixture.example.test/dashboard',
+  ]);
+  await clickLoad(page);
+  await page.waitForFunction(() => document.body.innerText.includes('account policy lacks open_business_browser'), {
+    timeout: 10000,
+  });
+}
+
+async function clickCompanyBrainSwitchClears(page) {
+  await clickLoad(page);
+  await clickFirstCompanyBrainAccount(page);
+  await askCompanyBrainFixtureQuestion(page);
+  await clickCustomerTarget(page, 'Denied Browser Fixture Co');
+  await waitForStaleMarkersCleared(page, 'company-brain-switch-clears-fixture', [
+    'Northstar Fixture Account',
+    'Renewal fixture brief',
+    'fixture-audit-company-directory',
+    'local-fixture:company-brain:query:fixture-company-renewal',
+  ]);
+  await clickLoad(page);
+  await page.waitForFunction(
+    () => document.body.innerText.includes('Company Brain denied for wrong customer fixture'),
+    {
+      timeout: 10000,
+    }
+  );
+}
+
 async function bodyText(page, timeout = 1500) {
   return page
     .locator('body')
@@ -749,6 +932,12 @@ async function runLocalShellSmoke(options = {}) {
         await clickBusinessBrowserStop(page);
       } else if (check.action === 'click-business-browser-denied-customer') {
         await clickBusinessBrowserDeniedCustomer(page);
+      } else if (check.action === 'click-connected-apps-switch-clears') {
+        await clickConnectedAppsSwitchClears(page);
+      } else if (check.action === 'click-business-browser-switch-clears') {
+        await clickBusinessBrowserSwitchClears(page);
+      } else if (check.action === 'click-company-brain-switch-clears') {
+        await clickCompanyBrainSwitchClears(page);
       } else if (check.action === 'click-refresh-targets') {
         await clickRefreshTargets(page);
       }
