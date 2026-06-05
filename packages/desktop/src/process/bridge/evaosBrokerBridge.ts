@@ -21,6 +21,7 @@ import {
 import { beginEvaosDesktopAuth } from '@process/services/evaosDesktopAuth';
 import {
   evaosLocalProductFixtureCustomerTargets,
+  evaosLocalProductFixtureSessionStatus,
   isEvaosLocalProductFixtureEnabled,
 } from '@process/services/evaosLocalProductFixture';
 import { assertEvaosRendererSafePayload } from './evaosRendererSecretGuard';
@@ -45,7 +46,10 @@ export function initEvaosBrokerBridge(client: EvaosBrokerSessionClient = getDefa
   );
 
   ipcBridge.evaosBroker.getSessionStatus.provider(
-    async (): Promise<BridgeResponse<IEvaosBrokerSessionStatus>> => toBridgeResponse(() => client.getSessionStatus())
+    async (): Promise<BridgeResponse<IEvaosBrokerSessionStatus>> =>
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled() ? evaosLocalProductFixtureSessionStatus() : client.getSessionStatus()
+      )
   );
 
   ipcBridge.evaosBroker.getCustomerTargets.provider(

@@ -5,6 +5,7 @@
  */
 
 import type {
+  IEvaosBrokerSessionStatus,
   IEvaosBusinessBrowserActionResult,
   IEvaosBusinessBrowserOpenUrlRequest,
   IEvaosBusinessBrowserRequest,
@@ -31,15 +32,36 @@ const CUSTOMER_ACCOUNT_ID = 'fixture-account-acme';
 const MEMBERSHIP_ID = 'fixture-member-owner';
 const NOW = '2026-06-04T10:00:00.000Z';
 const FIXTURE_LABEL = 'LOCAL FIXTURE - NOT LIVE BETA PROOF';
+type EvaosLocalProductFixturePersona = 'owner' | 'member';
 
 export function isEvaosLocalProductFixtureEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.AIONUI_E2E_TEST === '1' && env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE === '1';
 }
 
-export function evaosLocalProductFixtureCustomerTargets(): IEvaosCustomerTargetsView {
+export function evaosLocalProductFixturePersona(env: NodeJS.ProcessEnv = process.env): EvaosLocalProductFixturePersona {
+  return env.AIONUI_EVAOS_LOCAL_PRODUCT_FIXTURE_PERSONA === 'member' ? 'member' : 'owner';
+}
+
+export function evaosLocalProductFixtureSessionStatus(env: NodeJS.ProcessEnv = process.env): IEvaosBrokerSessionStatus {
+  const persona = evaosLocalProductFixturePersona(env);
   return clone({
-    roles: ['owner'],
-    isOperator: true,
+    state: 'authenticated',
+    authenticated: true,
+    expired: false,
+    userEmail: persona === 'member' ? 'member@example.test' : 'admin@100yen.org',
+    expiresAt: '2026-06-11T10:00:00.000Z',
+    source: 'memory',
+    message: `${FIXTURE_LABEL}: ${persona} desktop session active for local proof.`,
+  });
+}
+
+export function evaosLocalProductFixtureCustomerTargets(
+  env: NodeJS.ProcessEnv = process.env
+): IEvaosCustomerTargetsView {
+  const persona = evaosLocalProductFixturePersona(env);
+  return clone({
+    roles: persona === 'member' ? ['member'] : ['owner'],
+    isOperator: persona === 'owner',
     defaultCustomerId: CUSTOMER_ID,
     selectedCustomerId: CUSTOMER_ID,
     customers: [
@@ -60,7 +82,7 @@ export function evaosLocalProductFixtureCustomerTargets(): IEvaosCustomerTargets
         isDefault: false,
       },
     ],
-    summaryText: `${FIXTURE_LABEL}: 2 customer targets loaded`,
+    summaryText: `${FIXTURE_LABEL}: 2 customer targets loaded for ${persona} persona`,
   });
 }
 
