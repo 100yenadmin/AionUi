@@ -91,6 +91,7 @@ describe('evaOS local shell smoke', () => {
       'business-browser-empty-error',
       'company-brain-empty-error',
       'agent-settings-remote-guardrail',
+      'native-companion-boundary',
     ]);
     expect(localShellSmoke.TEAM_ROUTE_CHECK.name).toBe('team-route-redirect');
   });
@@ -118,6 +119,7 @@ describe('evaOS local shell smoke', () => {
       'people-access-loaded-fixture',
       'people-access-switch-clears-fixture',
       'connected-apps-loaded-fixture',
+      'approval-center-deny-fixture',
       'business-browser-loaded-fixture',
       'business-browser-launch-fixture',
       'business-browser-stop-fixture',
@@ -128,6 +130,9 @@ describe('evaOS local shell smoke', () => {
       'business-browser-switch-clears-fixture',
       'company-brain-loaded-fixture',
       'company-brain-switch-clears-fixture',
+      'terminal-loaded-fixture',
+      'terminal-switch-clears-fixture',
+      'native-companion-boundary-fixture',
     ]);
 
     const missionControlLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
@@ -208,6 +213,24 @@ describe('evaOS local shell smoke', () => {
     );
     expect(connectedAppsLoaded?.forbidden).toEqual(
       expect.arrayContaining(['desktop_session', 'provider_grant', 'grant_handle'])
+    );
+
+    const approvalCenterDeny = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'approval-center-deny-fixture'
+    );
+    expect(approvalCenterDeny).toEqual(
+      expect.objectContaining({
+        action: 'click-approval-center-deny',
+        loadedStateRequiredMarkers: ['approval request rows', 'deny/approve policy source', 'decision audit id'],
+        expected: expect.arrayContaining([
+          'Fixture approval request',
+          'ops-review@example.test',
+          'fixture-dest-email',
+          'Audit: fixture-audit-approval-request',
+          'Approval denied. openclaw: denied Audit fixture-audit-approval-deny.',
+        ]),
+        forbidden: expect.arrayContaining(['desktop_session', 'provider_grant', 'grant_handle']),
+      })
     );
 
     const businessBrowserLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
@@ -359,6 +382,50 @@ describe('evaOS local shell smoke', () => {
         ]),
       })
     );
+
+    const terminalLoaded = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'terminal-loaded-fixture'
+    );
+    expect(terminalLoaded).toEqual(
+      expect.objectContaining({
+        action: 'click-load-default-customer',
+        loadedStateRequiredMarkers: ['terminal runtime status', 'terminal source pointer', 'terminal audit id'],
+        expected: expect.arrayContaining([
+          'Customer VM shell is offline in this local fixture',
+          'Source: local-fixture:runtime:terminal-offline',
+          'Audit: fixture-audit-runtime-terminal-offline',
+        ]),
+      })
+    );
+
+    const terminalSwitch = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'terminal-switch-clears-fixture'
+    );
+    expect(terminalSwitch).toEqual(
+      expect.objectContaining({
+        action: 'click-terminal-switch-clears',
+        loadedStateRequiredMarkers: ['terminal stale-state clearing', 'terminal denied source pointer'],
+        forbidden: expect.arrayContaining([
+          'fixture-audit-runtime-terminal-offline',
+          'local-fixture:runtime:terminal-offline',
+        ]),
+      })
+    );
+
+    const nativeCompanion = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find(
+      (check) => check.name === 'native-companion-boundary-fixture'
+    );
+    expect(nativeCompanion).toEqual(
+      expect.objectContaining({
+        loadedStateRequiredMarkers: ['native companion boundary', 'deep-link policy', 'fallback requirement'],
+        expected: expect.arrayContaining([
+          'Mac & iPhone',
+          'Native companion boundary',
+          'Deep-link scheme: evaos-workbench-beta',
+          'Renderer receives callback secrets: false',
+        ]),
+      })
+    );
   });
 
   it('selects loaded product checks only when local fixture mode is explicitly enabled', () => {
@@ -405,6 +472,7 @@ describe('evaOS local shell smoke', () => {
         ['account directory rows', 'ingest/query status cards', 'directory source pointer'],
       ],
       ['agent-settings-remote-guardrail', ['local agent inventory result', 'remote guardrail copy']],
+      ['native-companion-boundary', ['native companion boundary', 'deep-link policy', 'fallback requirement']],
     ]);
 
     for (const route of localShellSmoke.ROUTE_CHECKS) {

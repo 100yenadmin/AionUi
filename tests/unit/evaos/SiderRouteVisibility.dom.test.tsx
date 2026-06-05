@@ -17,6 +17,7 @@ const authMock = vi.hoisted(() => ({
 
 const customerContextMock = vi.hoisted(() => ({
   roles: [] as string[],
+  scopes: [] as string[],
   isOperator: false,
   loaded: true,
   loading: false,
@@ -115,6 +116,7 @@ describe('Sider runtime route visibility', () => {
     authMock.status = 'authenticated';
     authMock.user = null;
     customerContextMock.roles = [];
+    customerContextMock.scopes = [];
     customerContextMock.isOperator = false;
     customerContextMock.loaded = true;
     customerContextMock.loading = false;
@@ -128,6 +130,7 @@ describe('Sider runtime route visibility', () => {
       refreshTargets: vi.fn(),
       selectCustomer: vi.fn(),
       roles: customerContextMock.roles,
+      scopes: customerContextMock.scopes,
       isOperator: customerContextMock.isOperator,
       loaded: customerContextMock.loaded,
       loading: customerContextMock.loading,
@@ -152,6 +155,8 @@ describe('Sider runtime route visibility', () => {
     renderSider();
 
     expect(screen.getByText('Mission Control')).toBeInTheDocument();
+    expect(screen.getByText('Terminal')).toBeInTheDocument();
+    expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
   });
 
   it('hides Mission Control for member sessions without technical runtime access', () => {
@@ -164,7 +169,9 @@ describe('Sider runtime route visibility', () => {
     renderSider();
 
     expect(screen.queryByText('Mission Control')).not.toBeInTheDocument();
+    expect(screen.queryByText('Terminal')).not.toBeInTheDocument();
     expect(screen.getByText('People Access')).toBeInTheDocument();
+    expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
   });
 
   it('keys route visibility to the current broker session identity', () => {

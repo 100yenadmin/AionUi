@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { EVAOS_BETA_IDENTITY } from '../common/evaos/betaIdentity';
+
+export { EVAOS_BETA_IDENTITY } from '../common/evaos/betaIdentity';
+
 type Env = NodeJS.ProcessEnv;
 
 export const EVAOS_BETA_ENV = 'AIONUI_EVAOS_BETA';
@@ -14,14 +18,6 @@ export const EVAOS_BETA_ALLOW_SENTRY_DEVICE_ID_ENV = 'AIONUI_EVAOS_BETA_ALLOW_SE
 export const EVAOS_BETA_ALLOW_STARTUP_LOGS_ENV = 'AIONUI_EVAOS_BETA_ALLOW_STARTUP_LOGS';
 export const EVAOS_BETA_ALLOW_REMOTE_WEBUI_ENV = 'AIONUI_EVAOS_BETA_ALLOW_REMOTE_WEBUI';
 const EVAOS_BETA_ALLOWED_UPDATE_REPOS = new Set(['100yenadmin/AionUi']);
-
-export const EVAOS_BETA_IDENTITY = {
-  productName: 'evaOS Workbench Beta',
-  executableName: 'EvaOSWorkbenchBeta',
-  appId: 'com.evaos.workbench.beta',
-  protocolScheme: 'evaos-workbench-beta',
-  loopbackCallbackPath: '/auth/evaos-workbench-beta/callback',
-} as const;
 
 export const EVAOS_BETA_UPDATE_DISABLED_MESSAGE =
   'Updates are disabled for evaOS Workbench Beta until an evaOS-owned beta update feed is configured.';

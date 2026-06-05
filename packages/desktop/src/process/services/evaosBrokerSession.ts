@@ -1093,6 +1093,7 @@ function sanitizeCustomerTargets(raw: unknown): IEvaosCustomerTargetsView {
 
   return stripUndefined({
     roles: safeTextList(record.roles, 80),
+    scopes: safePolicyScopeList(record.scopes) ?? [],
     isOperator: safeBoolean(record.is_operator) ?? false,
     defaultCustomerId: selectedCustomerId === defaultCustomerId ? defaultCustomerId : undefined,
     selectedCustomerId,

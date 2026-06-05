@@ -42,6 +42,8 @@ import {
   evaosLocalProductFixtureCompanyBrainAccount360,
   evaosLocalProductFixtureCompanyBrainDirectory,
   evaosLocalProductFixtureCompanyBrainQuery,
+  evaosLocalProductFixtureApprovalCenter,
+  evaosLocalProductFixtureDenyApproval,
   evaosLocalProductFixturePeopleAccessPolicy,
   evaosLocalProductFixtureProviderAction,
   evaosLocalProductFixtureProviderHub,
@@ -78,12 +80,20 @@ export function initEvaosApprovalCenterBridge(
 ): void {
   ipcBridge.evaosApprovalCenter.getApprovals.provider(
     async (request: IEvaosApprovalCenterRequest): Promise<BridgeResponse<IEvaosApprovalCenterView>> =>
-      toBridgeResponse(() => client.approvalCenter(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureApprovalCenter(request)
+          : client.approvalCenter(request)
+      )
   );
 
   ipcBridge.evaosApprovalCenter.denyApproval.provider(
     async (request: IEvaosApprovalDenyRequest): Promise<BridgeResponse<IEvaosApprovalDecisionResult>> =>
-      toBridgeResponse(() => client.denyApproval(request))
+      toBridgeResponse(() =>
+        isEvaosLocalProductFixtureEnabled()
+          ? evaosLocalProductFixtureDenyApproval(request)
+          : client.denyApproval(request)
+      )
   );
 }
 

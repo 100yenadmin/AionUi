@@ -12,7 +12,9 @@ import {
   SiderCompanyBrainEntry,
   SiderConnectedAppsEntry,
   SiderMissionControlEntry,
+  SiderNativeCompanionEntry,
   SiderPeopleAccessEntry,
+  SiderTerminalEntry,
 } from '@renderer/evaos/sidebar';
 import {
   EVAOS_APPROVAL_CENTER_ENABLED,
@@ -41,13 +43,22 @@ const EvaosSidebarSection: React.FC<EvaosSidebarSectionProps> = ({
   return (
     <>
       {canSeeMissionControl ? (
-        <SiderMissionControlEntry
-          isMobile={isMobile}
-          isActive={pathname === '/mission-control'}
-          collapsed={collapsed}
-          siderTooltipProps={siderTooltipProps}
-          onClick={() => onNavigate('/mission-control')}
-        />
+        <>
+          <SiderMissionControlEntry
+            isMobile={isMobile}
+            isActive={pathname === '/mission-control'}
+            collapsed={collapsed}
+            siderTooltipProps={siderTooltipProps}
+            onClick={() => onNavigate('/mission-control')}
+          />
+          <SiderTerminalEntry
+            isMobile={isMobile}
+            isActive={pathname === '/terminal'}
+            collapsed={collapsed}
+            siderTooltipProps={siderTooltipProps}
+            onClick={() => onNavigate('/terminal')}
+          />
+        </>
       ) : null}
       <SiderPeopleAccessEntry
         isMobile={isMobile}
@@ -92,6 +103,13 @@ const EvaosSidebarSection: React.FC<EvaosSidebarSectionProps> = ({
           onClick={() => onNavigate('/approval-center')}
         />
       ) : null}
+      <SiderNativeCompanionEntry
+        isMobile={isMobile}
+        isActive={pathname === '/native-companion'}
+        collapsed={collapsed}
+        siderTooltipProps={siderTooltipProps}
+        onClick={() => onNavigate('/native-companion')}
+      />
     </>
   );
 };
