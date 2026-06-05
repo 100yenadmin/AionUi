@@ -72,6 +72,42 @@ The fork path should continue because the sprint now has concrete evidence rathe
 | #67 Product Reality Pass: admin@100yen.org Real Customer Context | Closed                                      |                     92% | Real admin product proof is complete enough for the decision packet.                                                       |
 | #81 Live Customer End-to-End Proof Run                           | Closed                                      |                     92% | Aggregate live-product proof is complete enough for the decision packet.                                                   |
 
+## macOS-First CI Policy
+
+The beta target is macOS-first. Windows checks are release/nightly or Windows-touching gates, not blockers for docs, canary scripts, renderer-only routes, or macOS beta packaging work.
+
+Required PR gates remain code quality, unit tests, coverage, release-script safety, and macOS build where relevant. Intentionally skipped Windows jobs are not public-beta blockers unless the change touches Windows packaging, Electron builder Windows config, installer metadata, or cross-platform runtime behavior.
+
+## Post-Merge Sprint State
+
+PR #48 merged the combined stack into `evaos/dev`.
+
+PR #49 added the beta release credential inventory.
+
+Current post-merge state: the fork is viable for continued R&D, but not customer-distributable while #41 reusable live canaries, #1 governance closure or waiver, and release-channel publish review remain open or unwaived.
+
+## Local Shell Smoke Gate
+
+Before adding new feature slices, run an interactive local AionUi shell smoke. Start the app, wait for routes to settle, capture screenshots for Mission Control, People Access, Approval Center, Connected Apps, Business Browser, Company Brain, and Agent Settings, verify unsafe/overclaim surfaces are hidden, and verify honest empty/error states.
+
+Staging fixtures only block live backend canaries. They do not block the local shell smoke, and shell smoke must not be reported as product readiness.
+
+## Live Canary Fixture Provisioning
+
+Use the repo-owned fixture workflow before claiming reusable live beta proof:
+
+```bash
+npm run evaos:live-canary-fixtures -- --provisioning-template
+```
+
+The template is placeholder-only. It must be filled with safe staging values through secrets/fixtures that another agent can rerun without local-only magic.
+
+After provisioning, rerun the strict inventory:
+
+```bash
+node scripts/evaosLiveCanaryReadiness.js --strict
+```
+
 ## Verified Evidence
 
 Repository and issue evidence:

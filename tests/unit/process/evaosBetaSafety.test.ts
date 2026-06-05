@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   EVAOS_BETA_IDENTITY,
+  getEvaosBetaBackendGithubRepo,
   getEvaosBetaUpdateRepo,
   isEvaosBetaBuild,
   isAllowedEvaosBetaUpdateRepo,
@@ -40,6 +41,23 @@ describe('evaosBetaSafety', () => {
     expect(shouldAttachSentryDeviceId(env)).toBe(false);
     expect(shouldSendStartupLogReport(env)).toBe(false);
     expect(shouldAllowRemoteWebUI(env)).toBe(false);
+  });
+
+  it('forces bundled backend GitHub access to the evaOS-owned repo in beta mode', () => {
+    expect(getEvaosBetaBackendGithubRepo({ AIONUI_EVAOS_BETA: '1' })).toBe('100yenadmin/AionUi');
+    expect(
+      getEvaosBetaBackendGithubRepo({
+        AIONUI_EVAOS_BETA: '1',
+        AIONUI_EVAOS_BETA_UPDATE_REPO: 'iOfficeAI/AionUi',
+      })
+    ).toBe('100yenadmin/AionUi');
+    expect(
+      getEvaosBetaBackendGithubRepo({
+        AIONUI_EVAOS_BETA: '1',
+        AIONUI_EVAOS_BETA_UPDATE_REPO: '100yenadmin/AionUi',
+      })
+    ).toBe('100yenadmin/AionUi');
+    expect(getEvaosBetaBackendGithubRepo({ AIONUI_EVAOS_BETA: '0' })).toBeUndefined();
   });
 
   it('defaults to public beta fail-closed behavior when the beta env is omitted', () => {

@@ -70,7 +70,11 @@ import {
   setIsQuitting,
 } from './process/utils/tray';
 import { readCloseToTraySetting } from './process/utils/closeToTraySetting';
-import { shouldDisableAutoUpdate, shouldRegisterDefaultProtocolClient } from './process/evaosBetaSafety';
+import {
+  getEvaosBetaBackendGithubRepo,
+  shouldDisableAutoUpdate,
+  shouldRegisterDefaultProtocolClient,
+} from './process/evaosBetaSafety';
 // @ts-expect-error - electron-squirrel-startup doesn't have types
 import electronSquirrelStartup from 'electron-squirrel-startup';
 
@@ -544,6 +548,10 @@ const handleAppReady = async (): Promise<void> => {
   // close it before the backend touches the same file.
   const backendStartup = await startBackendOrExit({
     startBackend: async () => {
+      const betaBackendGithubRepo = getEvaosBetaBackendGithubRepo();
+      if (betaBackendGithubRepo) {
+        process.env.AIONUI_GITHUB_REPO = betaBackendGithubRepo;
+      }
       const { getDataPath } = await import('./process/utils/utils');
       const { getSystemDir } = await import('./process/utils/initStorage');
       const sysDir = getSystemDir();
