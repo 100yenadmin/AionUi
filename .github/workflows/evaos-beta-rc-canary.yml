@@ -294,6 +294,7 @@ jobs:
               const stat = fs.statSync(file);
               if (stat.isDirectory()) {
                 if (name === 'Frameworks') continue;
+                if (name === 'bundled-aioncore') continue;
                 walk(file);
                 continue;
               }

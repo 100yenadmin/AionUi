@@ -287,6 +287,8 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
   const prepareAssets = readText(rootDir, 'scripts/prepare-release-assets.sh');
   const rollbackDoc = readText(rootDir, 'docs/evaos/public-beta-packaging-rollback.md');
   const changelog = readText(rootDir, 'CHANGELOG.md');
+  const desktopIndex = readText(rootDir, 'packages/desktop/src/index.ts');
+  const betaSafety = readText(rootDir, 'packages/desktop/src/process/evaosBetaSafety.ts');
   const webManifest = readText(rootDir, 'public/manifest.webmanifest');
   const rendererHtml = readText(rootDir, 'packages/desktop/src/renderer/index.html');
   const titlebar = readText(rootDir, 'packages/desktop/src/renderer/components/layout/Titlebar/index.tsx');
@@ -422,6 +424,13 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
   requireText(rcCanary, 'broker_session_proof_ref', '.github/workflows/evaos-beta-rc-canary.yml', issues);
   requireText(
     rcCanary,
+    "if (name === 'bundled-aioncore') continue;",
+    '.github/workflows/evaos-beta-rc-canary.yml',
+    issues,
+    'compiled backend binary excluded from shell feed/support grep'
+  );
+  requireText(
+    rcCanary,
     'scripts/evaosBetaReleaseGate.js verify-rc-proof',
     '.github/workflows/evaos-beta-rc-canary.yml',
     issues
@@ -493,6 +502,17 @@ function collectReleaseConfigIssues(rootDir = process.cwd()) {
   if (about.includes('https://github.com/iOfficeAI/AionUi') || about.includes('https://www.aionui.com')) {
     issues.push('AboutModalContent.tsx: upstream AionUi support or website link is not allowed in beta About screen');
   }
+
+  requireText(betaSafety, "EVAOS_BETA_DEFAULT_GITHUB_REPO = '100yenadmin/AionUi'", 'evaosBetaSafety.ts', issues);
+  requireText(betaSafety, 'getEvaosBetaBackendGithubRepo', 'evaosBetaSafety.ts', issues);
+  requireText(desktopIndex, 'getEvaosBetaBackendGithubRepo', 'packages/desktop/src/index.ts', issues);
+  requireText(
+    desktopIndex,
+    'process.env.AIONUI_GITHUB_REPO = betaBackendGithubRepo',
+    'packages/desktop/src/index.ts',
+    issues,
+    'aioncore GitHub repo process env override for evaOS beta'
+  );
 
   return issues;
 }

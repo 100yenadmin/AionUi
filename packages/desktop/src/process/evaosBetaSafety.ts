@@ -17,7 +17,8 @@ export const EVAOS_BETA_ALLOW_SENTRY_ENV = 'AIONUI_EVAOS_BETA_ALLOW_SENTRY';
 export const EVAOS_BETA_ALLOW_SENTRY_DEVICE_ID_ENV = 'AIONUI_EVAOS_BETA_ALLOW_SENTRY_DEVICE_ID';
 export const EVAOS_BETA_ALLOW_STARTUP_LOGS_ENV = 'AIONUI_EVAOS_BETA_ALLOW_STARTUP_LOGS';
 export const EVAOS_BETA_ALLOW_REMOTE_WEBUI_ENV = 'AIONUI_EVAOS_BETA_ALLOW_REMOTE_WEBUI';
-const EVAOS_BETA_ALLOWED_UPDATE_REPOS = new Set(['100yenadmin/AionUi']);
+export const EVAOS_BETA_DEFAULT_GITHUB_REPO = '100yenadmin/AionUi';
+const EVAOS_BETA_ALLOWED_UPDATE_REPOS = new Set([EVAOS_BETA_DEFAULT_GITHUB_REPO]);
 
 export const EVAOS_BETA_UPDATE_DISABLED_MESSAGE =
   'Updates are disabled for evaOS Workbench Beta until an evaOS-owned beta update feed is configured.';
@@ -42,6 +43,12 @@ export function getEvaosBetaUpdateRepo(env: Env = process.env): string | undefin
 
 export function isAllowedEvaosBetaUpdateRepo(repo: string | undefined): boolean {
   return !!repo && EVAOS_BETA_ALLOWED_UPDATE_REPOS.has(repo);
+}
+
+export function getEvaosBetaBackendGithubRepo(env: Env = process.env): string | undefined {
+  if (!isEvaosBetaBuild(env)) return undefined;
+  const configuredRepo = getEvaosBetaUpdateRepo(env);
+  return isAllowedEvaosBetaUpdateRepo(configuredRepo) ? configuredRepo : EVAOS_BETA_DEFAULT_GITHUB_REPO;
 }
 
 export function shouldDisableAutoUpdate(env: Env = process.env): boolean {
