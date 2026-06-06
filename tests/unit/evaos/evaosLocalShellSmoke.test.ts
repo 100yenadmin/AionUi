@@ -12,6 +12,12 @@ import { describe, expect, it } from 'vitest';
 
 const require = createRequire(import.meta.url);
 const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
+  BROKER_GUARDED_ROUTE_CHECKS: Array<{
+    name: string;
+    hash: string;
+    expected: string[];
+    forbidden: string[];
+  }>;
   PROOF_STAGES: {
     SHELL_SMOKE: string;
     PRODUCT_LOADED_STATE: string;
@@ -70,7 +76,7 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     action?: string;
     isolateRendererState?: boolean;
   }>;
-  shellSmokeEnv: (artifactsDir: string, env?: NodeJS.ProcessEnv) => NodeJS.ProcessEnv;
+  shellSmokeEnv: (artifactsDir: string, env?: NodeJS.ProcessEnv, repoRoot?: string) => NodeJS.ProcessEnv;
   isLocalProductMemberPersona: (env?: NodeJS.ProcessEnv) => boolean;
   textFindings: (
     route: string,
@@ -85,13 +91,15 @@ describe('evaOS local shell smoke', () => {
   it('covers every beta shell route required before new feature slices', () => {
     expect(localShellSmoke.ROUTE_CHECKS.map((check) => check.name)).toEqual([
       'mission-control',
-      'people-access-empty-error',
-      'approval-center-empty-error',
-      'connected-apps-empty-error',
-      'business-browser-empty-error',
-      'company-brain-empty-error',
       'agent-settings-remote-guardrail',
       'native-companion-boundary',
+    ]);
+    expect(localShellSmoke.BROKER_GUARDED_ROUTE_CHECKS.map((check) => check.name)).toEqual([
+      'people-access-broker-guard',
+      'approval-center-broker-guard',
+      'connected-apps-broker-guard',
+      'business-browser-broker-guard',
+      'company-brain-broker-guard',
     ]);
     expect(localShellSmoke.TEAM_ROUTE_CHECK.name).toBe('team-route-redirect');
   });
@@ -467,17 +475,6 @@ describe('evaOS local shell smoke', () => {
   it('keeps future loaded-state proof markers distinct from title-only waits', () => {
     const loadedProofMarkers = new Map([
       ['mission-control', ['desktop session card', 'broker source pointer', 'current audit id']],
-      ['people-access-empty-error', ['member rows', 'role badges', 'account policy source pointer']],
-      ['approval-center-empty-error', ['approval request rows', 'deny/approve policy source', 'decision audit id']],
-      [
-        'connected-apps-empty-error',
-        ['provider profile cards', 'grant/revoke status badges', 'provider source pointer'],
-      ],
-      ['business-browser-empty-error', ['browser runtime status', 'current URL summary', 'browser audit id']],
-      [
-        'company-brain-empty-error',
-        ['account directory rows', 'ingest/query status cards', 'directory source pointer'],
-      ],
       ['agent-settings-remote-guardrail', ['local agent inventory result', 'remote guardrail copy']],
       [
         'native-companion-boundary',
@@ -491,16 +488,29 @@ describe('evaOS local shell smoke', () => {
     }
   });
 
-  it('exercises customer-target recovery on product routes that depend on Workbench customer context', () => {
-    for (const routeName of [
-      'people-access-empty-error',
-      'approval-center-empty-error',
-      'connected-apps-empty-error',
-      'business-browser-empty-error',
-      'company-brain-empty-error',
-    ]) {
-      const route = localShellSmoke.ROUTE_CHECKS.find((check) => check.name === routeName);
-      expect(route?.action).toBe('click-refresh-targets');
+  it('keeps broker-required evaOS routes in guarded redirect proof for default shell smoke', () => {
+    for (const route of localShellSmoke.BROKER_GUARDED_ROUTE_CHECKS) {
+      expect(route.expected).toContain('evaOS Workbench Beta');
+      expect(route.forbidden).toEqual(expect.arrayContaining(['desktop_session', 'Bearer', 'provider_grant']));
+    }
+  });
+
+  it('points local smoke at repo managed resources through an explicit bundled backend override', () => {
+    expect(localShellSmoke.shellSmokeEnv('/artifacts', {}, '/repo').AIONUI_BACKEND_BUNDLED_DIR).toBe(
+      path.join('/repo', 'resources', 'bundled-aioncore')
+    );
+  });
+
+  it('exercises customer-target recovery in fixture mode on product routes that depend on Workbench customer context', () => {
+    for (const [routeName, action] of [
+      ['people-access-loaded-fixture', 'click-load-default-customer'],
+      ['approval-center-deny-fixture', 'click-approval-center-deny'],
+      ['connected-apps-loaded-fixture', 'click-load-default-customer'],
+      ['business-browser-loaded-fixture', 'click-load-default-customer'],
+      ['company-brain-loaded-fixture', 'click-load-company-brain'],
+    ] as const) {
+      const route = localShellSmoke.LOCAL_PRODUCT_ROUTE_CHECKS.find((check) => check.name === routeName);
+      expect(route?.action).toBe(action);
       expect(route?.isolateRendererState).toBe(true);
     }
   });

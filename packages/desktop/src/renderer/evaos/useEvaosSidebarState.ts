@@ -30,7 +30,8 @@ export function useEvaosSidebarState(): EvaosSidebarState {
     !brokerSessionStatus.session.expired;
   const customerContext = useEvaosCustomerContext(
     brokerAuthenticated,
-    evaosBrokerSessionKey(brokerSessionStatus.session)
+    evaosBrokerSessionKey(brokerSessionStatus.session),
+    brokerSessionStatus.loading ? { clearOnUnauthenticated: false } : undefined
   );
 
   const routeContext = useMemo(

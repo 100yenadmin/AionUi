@@ -209,7 +209,8 @@ export async function refreshEvaosCustomerTargets(): Promise<void> {
 
 export function useEvaosCustomerContext(
   authenticated: boolean,
-  sessionKey?: string | null
+  sessionKey?: string | null,
+  options?: { clearOnUnauthenticated?: boolean }
 ): EvaosCustomerContextState & {
   selectedTarget?: IEvaosCustomerTargetView;
   refreshTargets: () => Promise<void>;
@@ -217,10 +218,13 @@ export function useEvaosCustomerContext(
 } {
   const current = useSyncExternalStore(subscribe, snapshot, snapshot);
   const normalizedSessionKey = authenticated ? normalizeSessionKey(sessionKey) : undefined;
+  const clearOnUnauthenticated = options?.clearOnUnauthenticated !== false;
 
   useEffect(() => {
     if (!authenticated) {
-      clearEvaosCustomerContext();
+      if (clearOnUnauthenticated) {
+        clearEvaosCustomerContext();
+      }
       return;
     }
     if (normalizedSessionKey && activeSessionKey !== normalizedSessionKey) {
@@ -231,7 +235,7 @@ export function useEvaosCustomerContext(
     if (!state.loaded && !state.loading) {
       void refreshEvaosCustomerTargets();
     }
-  }, [authenticated, normalizedSessionKey]);
+  }, [authenticated, clearOnUnauthenticated, normalizedSessionKey]);
 
   const refreshTargets = useCallback(async () => {
     if (!authenticated) {
@@ -270,7 +274,8 @@ export function useEvaosBrokeredCustomerContext(): {
     brokerSessionStatus.session?.authenticated === true && brokerSessionStatus.session.expired !== true;
   const customerContext = useEvaosCustomerContext(
     brokerAuthenticated,
-    evaosBrokerSessionKey(brokerSessionStatus.session)
+    evaosBrokerSessionKey(brokerSessionStatus.session),
+    brokerSessionStatus.loading ? { clearOnUnauthenticated: false } : undefined
   );
 
   return {

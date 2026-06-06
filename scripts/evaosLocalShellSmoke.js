@@ -30,133 +30,13 @@ const ROUTE_CHECKS = [
     forbidden: ['Root PR #15', 'Stack approval', 'ship public beta', 'ready to ship'],
   },
   {
-    name: 'people-access-empty-error',
-    hash: '/people-access',
-    title: 'People Access',
-    proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: [
-      'People Access',
-      'Customer context',
-      'Refresh targets',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    loadedStateRequiredMarkers: ['member rows', 'role badges', 'account policy source pointer'],
-    action: 'click-refresh-targets',
-    isolateRendererState: true,
-    expected: [
-      'People Access',
-      'Members, roles, invites, and seats from the evaOS account policy plane.',
-      'Customer context',
-      'Refresh targets',
-      'Load a customer account policy to view People Access.',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    forbidden: ['desktop_session', 'Bearer', 'provider_grant'],
-  },
-  {
-    name: 'approval-center-empty-error',
-    hash: '/approval-center',
-    title: 'Approval Center',
-    proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: [
-      'Approval Center',
-      'Customer context',
-      'Refresh targets',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    loadedStateRequiredMarkers: ['approval request rows', 'deny/approve policy source', 'decision audit id'],
-    action: 'click-refresh-targets',
-    isolateRendererState: true,
-    expected: [
-      'Approval Center',
-      'Human decisions for risky agent actions',
-      'Customer context',
-      'Refresh targets',
-      'Load a customer account to review pending approval requests.',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    forbidden: ['desktop_session', 'Bearer', 'provider_grant'],
-  },
-  {
-    name: 'connected-apps-empty-error',
-    hash: '/connected-apps',
-    title: 'Connected Apps',
-    proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: [
-      'Connected Apps',
-      'Customer context',
-      'Refresh targets',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    loadedStateRequiredMarkers: ['provider profile cards', 'grant/revoke status badges', 'provider source pointer'],
-    action: 'click-refresh-targets',
-    isolateRendererState: true,
-    expected: [
-      'Connected Apps',
-      'Brokered provider status, grants, and revocation',
-      'Customer context',
-      'Refresh targets',
-      'Load a customer account to view connected app evidence.',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'grant_handle'],
-  },
-  {
-    name: 'business-browser-empty-error',
-    hash: '/business-browser',
-    title: 'Business Browser',
-    proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: [
-      'Business Browser',
-      'Customer context',
-      'Refresh targets',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    loadedStateRequiredMarkers: ['browser runtime status', 'current URL summary', 'browser audit id'],
-    action: 'click-refresh-targets',
-    isolateRendererState: true,
-    expected: [
-      'Business Browser',
-      'Brokered browser and VM runtime state',
-      'Customer context',
-      'Refresh targets',
-      'Load a customer account to view browser runtime evidence.',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    forbidden: ['desktop_session', 'Bearer', 'provider_grant'],
-  },
-  {
-    name: 'company-brain-empty-error',
-    hash: '/company-brain',
-    title: 'Company Brain',
-    proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: [
-      'Company Brain',
-      'Customer context',
-      'Refresh targets',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    loadedStateRequiredMarkers: ['account directory rows', 'ingest/query status cards', 'directory source pointer'],
-    action: 'click-refresh-targets',
-    isolateRendererState: true,
-    expected: [
-      'Company Brain',
-      'Org-scoped account directory, account brief, timeline, query, and exception evidence.',
-      'Customer context',
-      'Refresh targets',
-      'Load a customer account to view Company Brain evidence.',
-      'Sign in to evaOS before loading customer targets.',
-    ],
-    forbidden: ['desktop_session', 'Bearer', 'provider_grant'],
-  },
-  {
     name: 'agent-settings-remote-guardrail',
     hash: '/settings/agent',
     title: 'Agent',
     proofStage: PROOF_STAGES.SHELL_SMOKE,
-    settledMarkers: ['Local Agents', 'No local agents detected'],
+    settledMarkers: ['Local Agents', 'Aion CLI is the built-in agent', 'Detect Custom Agent'],
     loadedStateRequiredMarkers: ['local agent inventory result', 'remote guardrail copy'],
-    expected: ['Local Agents', 'No local agents detected'],
+    expected: ['Local Agents', 'Aion CLI is the built-in agent', 'Detect Custom Agent'],
     forbidden: ['Root PR #15', 'Stack approval', 'Remote Agents', 'Allow insecure', 'Handshake', 'Connect remote'],
   },
   {
@@ -199,6 +79,44 @@ const ROUTE_CHECKS = [
       'Boundary clean',
     ],
     forbidden: ['desktop_session', 'Bearer', 'provider_grant', 'access_token', 'refresh_token'],
+  },
+];
+
+const BROKER_GUARDED_ROUTE_CHECKS = [
+  {
+    name: 'people-access-broker-guard',
+    hash: '/people-access',
+    screenshotName: 'people-access-broker-guard',
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['People Access', 'Fixture Owner', 'member rows', 'desktop_session', 'Bearer', 'provider_grant'],
+  },
+  {
+    name: 'approval-center-broker-guard',
+    hash: '/approval-center',
+    screenshotName: 'approval-center-broker-guard',
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['Approval Center', 'approval request rows', 'desktop_session', 'Bearer', 'provider_grant'],
+  },
+  {
+    name: 'connected-apps-broker-guard',
+    hash: '/connected-apps',
+    screenshotName: 'connected-apps-broker-guard',
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['Connected Apps', 'Google Workspace', 'desktop_session', 'Bearer', 'provider_grant', 'grant_handle'],
+  },
+  {
+    name: 'business-browser-broker-guard',
+    hash: '/business-browser',
+    screenshotName: 'business-browser-broker-guard',
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['Business Browser', 'fixture.example.test', 'desktop_session', 'Bearer', 'provider_grant'],
+  },
+  {
+    name: 'company-brain-broker-guard',
+    hash: '/company-brain',
+    screenshotName: 'company-brain-broker-guard',
+    expected: ['evaOS Workbench Beta'],
+    forbidden: ['Company Brain', 'Renewal fixture brief', 'desktop_session', 'Bearer', 'provider_grant'],
   },
 ];
 
@@ -855,13 +773,14 @@ function ensureDirs(artifactRoot) {
   return { screenshotsDir, artifactsDir };
 }
 
-function shellSmokeEnv(artifactsDir, env = process.env) {
+function shellSmokeEnv(artifactsDir, env = process.env, repoRoot = process.cwd()) {
   return {
     ...env,
     AIONUI_E2E_TEST: '1',
     AIONUI_DISABLE_AUTO_UPDATE: '1',
     AIONUI_DISABLE_DEVTOOLS: '1',
     AIONUI_CDP_PORT: '0',
+    AIONUI_BACKEND_BUNDLED_DIR: path.join(repoRoot, 'resources', 'bundled-aioncore'),
     AIONUI_EXTENSIONS_PATH: path.join(artifactsDir, 'extensions'),
     AIONUI_EXTENSION_STATES_FILE: path.join(artifactsDir, 'extension-states.json'),
     AIONUI_EVAOS_BETA: '1',
@@ -1319,7 +1238,7 @@ async function runLocalShellSmoke(options = {}) {
   const artifactRoot = options.artifactRoot || DEFAULT_ARTIFACT_ROOT;
   const { screenshotsDir, artifactsDir } = ensureDirs(artifactRoot);
   const electron = options.electron?._electron || options.electron || loadPlaywrightElectron(repoRoot);
-  const launchEnv = shellSmokeEnv(artifactsDir, options.env || process.env);
+  const launchEnv = shellSmokeEnv(artifactsDir, options.env || process.env, repoRoot);
   const routeChecks = options.routeChecks || routeChecksForEnv(launchEnv);
   const consoleMessages = [];
   const pageErrors = [];
@@ -1431,6 +1350,27 @@ async function runLocalShellSmoke(options = {}) {
       });
     }
 
+    if (!isLocalProductFixtureMode(launchEnv)) {
+      for (const check of BROKER_GUARDED_ROUTE_CHECKS) {
+        console.log(`[evaos-local-shell-smoke] guarded route ${check.name} -> #${check.hash}`);
+        await navigate(page, check.hash);
+        await page.waitForURL(/#\/guid/, { timeout: 8000 });
+        await page.waitForTimeout(450);
+        const text = await page.locator('body').innerText({ timeout: 10000 });
+        findings.push(...textFindings(check.name, text, check.expected, check.forbidden));
+        const screenshotPath = await routeScreenshot(page, screenshotsDir, check.screenshotName);
+        results.push({
+          route: check.name,
+          hash: check.hash,
+          screenshotPath,
+          textLength: text.trim().length,
+          proofStage: PROOF_STAGES.SHELL_SMOKE,
+          settledMarkers: check.expected,
+          loadedStateRequiredMarkers: ['redirected #/guid route', 'broker session required'],
+        });
+      }
+    }
+
     await navigate(page, TEAM_ROUTE_CHECK.hash);
     await page.waitForURL(/#\/guid/, { timeout: 8000 });
     const teamRedirectText = await page.locator('body').innerText({ timeout: 10000 });
@@ -1493,6 +1433,7 @@ if (require.main === module) {
 }
 
 module.exports = {
+  BROKER_GUARDED_ROUTE_CHECKS,
   DEFAULT_ARTIFACT_ROOT,
   GLOBAL_FORBIDDEN_PATTERNS,
   LOCAL_PRODUCT_MEMBER_ROUTE_CHECKS,

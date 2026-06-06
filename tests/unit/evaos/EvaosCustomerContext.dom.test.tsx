@@ -214,6 +214,27 @@ describe('EvaosCustomerContext', () => {
     expect(result.current.selectedTarget?.displayName).toBe('Second Customer');
   });
 
+  it('preserves already-loaded customer context while an independent broker check is pending', async () => {
+    brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
+
+    const { result, rerender } = renderHook(
+      ({ authenticated, clearOnUnauthenticated }) =>
+        useEvaosCustomerContext(authenticated, undefined, { clearOnUnauthenticated }),
+      {
+        initialProps: { authenticated: true, clearOnUnauthenticated: true },
+      }
+    );
+
+    await waitFor(() => expect(result.current.selectedCustomerId).toBe('david-poku'));
+
+    rerender({ authenticated: false, clearOnUnauthenticated: false });
+
+    expect(result.current.selectedCustomerId).toBe('david-poku');
+    expect(result.current.selectedTarget?.displayName).toBe('David Poku Co');
+    expect(result.current.loaded).toBe(true);
+    expect(brokerMocks.getCustomerTargets).toHaveBeenCalledTimes(1);
+  });
+
   it('clears and refetches role state when the authenticated broker session identity changes', async () => {
     brokerMocks.getCustomerTargets
       .mockResolvedValueOnce(customerTargets())
