@@ -85,10 +85,7 @@ const PanelRoute: React.FC<{ layout: React.ReactElement }> = ({ layout }) => {
           <Route path='/scheduled' element={withRouteFallback(ScheduledTasksPage)} />
           <Route path='/scheduled/:job_id' element={withRouteFallback(TaskDetailPage)} />
         </Route>
-        <Route
-          path='*'
-          element={<Navigate to={status === 'authenticated' ? '/evaos' : '/login'} replace />}
-        />
+        <Route path='*' element={<Navigate to={status === 'authenticated' ? '/evaos' : '/login'} replace />} />
       </Routes>
     </HashRouter>
   );

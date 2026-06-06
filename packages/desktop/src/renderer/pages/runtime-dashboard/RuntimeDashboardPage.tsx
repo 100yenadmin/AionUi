@@ -245,7 +245,11 @@ const RuntimeDashboardPage: React.FC<RuntimeDashboardPageProps> = ({ runtimeKey,
           </div>
 
           <div className='mt-12px flex items-start gap-8px text-12px leading-18px text-t-secondary'>
-            {attachAvailable ? <Open theme='outline' size='15' className='mt-1px shrink-0' /> : <Shield theme='outline' size='15' className='mt-1px shrink-0' />}
+            {attachAvailable ? (
+              <Open theme='outline' size='15' className='mt-1px shrink-0' />
+            ) : (
+              <Shield theme='outline' size='15' className='mt-1px shrink-0' />
+            )}
             <span>
               {attachAvailable
                 ? 'Broker evidence says this runtime has a safe dashboard attach action.'

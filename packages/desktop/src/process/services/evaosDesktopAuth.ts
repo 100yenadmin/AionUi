@@ -161,7 +161,10 @@ async function startLoopbackReceiver(
   const address = server.address();
   if (!address || typeof address === 'string') {
     server.close();
-    throw new EvaosBrokerSessionError('broker_network_error', 'evaOS Workbench could not create a local sign-in callback.');
+    throw new EvaosBrokerSessionError(
+      'broker_network_error',
+      'evaOS Workbench could not create a local sign-in callback.'
+    );
   }
 
   return {
