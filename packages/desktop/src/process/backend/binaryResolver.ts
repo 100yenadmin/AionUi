@@ -7,7 +7,7 @@
  */
 
 import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { execSync } from 'node:child_process';
 
 const BINARY_NAME = 'aioncore';
@@ -94,11 +94,16 @@ function bundledPath(
   binaryName: string,
   diagnostics: BackendBinaryResolveDiagnostics
 ): string | null {
-  const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
+  const overrideBundledDir = process.env.AIONUI_BACKEND_BUNDLED_DIR?.trim();
+  const resourcesPath =
+    overrideBundledDir && overrideBundledDir.length > 0
+      ? dirname(overrideBundledDir)
+      : (process as NodeJS.Process & { resourcesPath?: string }).resourcesPath;
   if (!resourcesPath) return null;
   diagnostics.resourcesPath = resourcesPath;
 
-  const bundledDir = join(resourcesPath, 'bundled-aioncore');
+  const bundledDir =
+    overrideBundledDir && overrideBundledDir.length > 0 ? overrideBundledDir : join(resourcesPath, 'bundled-aioncore');
   const runtimeDir = join(bundledDir, runtimeKey);
   const candidate = join(runtimeDir, binaryName);
   diagnostics.checkedBundledPath = candidate;

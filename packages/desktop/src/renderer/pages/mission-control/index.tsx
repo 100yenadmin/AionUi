@@ -207,7 +207,11 @@ const MissionControlPage: React.FC = () => {
   const [deviceCodeStatus, setDeviceCodeStatus] = useState<string | null>(null);
   const [claimingDeviceCode, setClaimingDeviceCode] = useState(false);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<string | null>(null);
-  const customerContext = useEvaosCustomerContext(session?.authenticated === true, customerContextSessionKey(session));
+  const customerContext = useEvaosCustomerContext(
+    session?.authenticated === true,
+    customerContextSessionKey(session),
+    loadingSession ? { clearOnUnauthenticated: false } : undefined
+  );
   const selectedCustomerRef = useRef<string | undefined>(customerContext.selectedCustomerId);
   const requestEpochRef = useRef(0);
 

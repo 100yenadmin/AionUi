@@ -225,7 +225,8 @@ describe('Sider runtime route visibility', () => {
 
     expect(customerContextMock.useEvaosCustomerContext).toHaveBeenCalledWith(
       true,
-      expect.stringContaining('admin@100yen.org')
+      expect.stringContaining('admin@100yen.org'),
+      undefined
     );
   });
 
@@ -237,7 +238,8 @@ describe('Sider runtime route visibility', () => {
     expect(await screen.findByTestId('mock-settings-sider')).toBeInTheDocument();
     expect(customerContextMock.useEvaosCustomerContext).toHaveBeenCalledWith(
       true,
-      expect.stringContaining('admin@100yen.org')
+      expect.stringContaining('admin@100yen.org'),
+      undefined
     );
   });
 });

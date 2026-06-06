@@ -169,8 +169,20 @@ describe('EvaosRuntimeRouteGuard', () => {
 
     expect(customerContextMock.useEvaosCustomerContext).toHaveBeenCalledWith(
       true,
-      expect.stringContaining('admin@100yen.org')
+      expect.stringContaining('admin@100yen.org'),
+      undefined
     );
+  });
+
+  it('preserves shared customer context while a newly mounted broker check is pending', () => {
+    brokerSessionMock.loading = true;
+    brokerSessionMock.session = null as unknown as IEvaosBrokerSessionStatus;
+
+    renderGuardedRoute('/people-access');
+
+    expect(customerContextMock.useEvaosCustomerContext).toHaveBeenCalledWith(false, undefined, {
+      clearOnUnauthenticated: false,
+    });
   });
 
   it('lets Mission Control render while customer context is still loading', () => {

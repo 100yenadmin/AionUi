@@ -25,7 +25,8 @@ export const EvaosRuntimeRouteGuard: React.FC<EvaosRuntimeRouteGuardProps> = ({ 
     authenticated && brokerSessionStatus.session?.authenticated === true && !brokerSessionStatus.session.expired;
   const customerContext = useEvaosCustomerContext(
     brokerAuthenticated,
-    evaosBrokerSessionKey(brokerSessionStatus.session)
+    evaosBrokerSessionKey(brokerSessionStatus.session),
+    brokerSessionStatus.loading ? { clearOnUnauthenticated: false } : undefined
   );
 
   if (status === 'checking') {
