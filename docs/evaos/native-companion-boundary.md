@@ -1,14 +1,14 @@
 # evaOS Native Companion Boundary
 
-Issue: https://github.com/100yenadmin/AionUi/issues/11
+Issue: https://github.com/100yenadmin/AionUi/issues/133
 
-Version: `2026-06-04.issue-11`
+Version: `2026-06-06.rc-parity`
 
 ## Position
 
 AionUi is the evaOS beta shell and workflow compositor. It can render broker-provided state, request brokered actions, and show native-companion health or denial states. It is not the local trust authority for the Mac.
 
-The evaOS native companion and broker remain authoritative for Mac pairing, TCC/local control, secure callbacks, signed helper behavior, local credential custody, and audited local machine actions. The current released Workbench app remains the fallback until signed beta passes issue #12 packaging, rollback, and support gates.
+The evaOS native companion and broker remain authoritative for Mac pairing, TCC/local control, secure callbacks, signed helper behavior, local credential custody, and audited local machine actions. The current released Workbench app remains the fallback until exact RC candidate passes native adapter, release, rollback, and support gates.
 
 ## Ownership Matrix
 
@@ -57,7 +57,7 @@ Read-only legacy filesystem browse/preview routes are not native-companion autho
 
 ## Beta Release Note
 
-evaOS Workbench Beta is a shell/workflow compositor. Mac pairing, TCC/local control, secure callbacks, signed helpers, local credential custody, and local machine audit authority remain in the evaOS native companion and broker-backed Workbench fallback.
+evaOS Workbench Beta is a shell/workflow compositor. Mac pairing, TCC/local control, secure callbacks, signed helpers, local credential custody, and local machine audit authority remain in the evaOS native companion and broker-backed Workbench fallback until exact-candidate native canaries pass.
 
 ## Remaining Beta Blockers
 

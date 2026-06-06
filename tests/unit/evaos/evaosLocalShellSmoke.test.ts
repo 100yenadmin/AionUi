@@ -417,7 +417,12 @@ describe('evaOS local shell smoke', () => {
     );
     expect(nativeCompanion).toEqual(
       expect.objectContaining({
-        loadedStateRequiredMarkers: ['native companion status matrix', 'open-native handoff', 'deep-link policy'],
+        loadedStateRequiredMarkers: [
+          'native companion status matrix',
+          'open-native handoff',
+          'deep-link policy',
+          'RC native canary contract',
+        ],
         expected: expect.arrayContaining([
           'Mac & iPhone',
           'Native companion status matrix',
@@ -474,7 +479,10 @@ describe('evaOS local shell smoke', () => {
         ['account directory rows', 'ingest/query status cards', 'directory source pointer'],
       ],
       ['agent-settings-remote-guardrail', ['local agent inventory result', 'remote guardrail copy']],
-      ['native-companion-boundary', ['native companion status matrix', 'open-native handoff', 'deep-link policy']],
+      [
+        'native-companion-boundary',
+        ['native companion status matrix', 'open-native handoff', 'deep-link policy', 'RC native canary contract'],
+      ],
     ]);
 
     for (const route of localShellSmoke.ROUTE_CHECKS) {
