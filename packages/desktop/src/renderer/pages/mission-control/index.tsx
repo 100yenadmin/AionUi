@@ -460,8 +460,9 @@ const MissionControlPage: React.FC = () => {
                   <Tag color='orange'>Parity audit active</Tag>
                 </div>
                 <p className='m-0 mt-4px max-w-760px text-13px leading-20px text-t-secondary'>
-                  evaOS Workbench Beta is the shell candidate. User-testing RC distribution stays blocked until the
-                  parity, upstream-regression, native-adapter, branding, and exact-candidate proof gates below pass.
+                  evaOS Workbench Beta is the beta shell candidate. Start evaOS Workbench Beta locally for RC proof, but
+                  user-testing distribution stays blocked until the parity, upstream-regression, native-adapter,
+                  branding, and exact-candidate gates below pass.
                 </p>
               </div>
               <Tag color='gray'>RC audit</Tag>

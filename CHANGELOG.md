@@ -12,6 +12,65 @@
 - Public beta release builds and distribution now fail closed unless the release path keeps the evaOS beta app identity, blocks upstream-branded assets, validates release provenance, and requires real macOS signing/notarization when publishing is enabled.
 - Added rollback and support notes for the evaOS Workbench Beta artifact while the released macOS app remains the fallback.
 
+## [2.1.12](https://github.com/iOfficeAI/AionUi/compare/v2.1.11...v2.1.12) (2026-06-05)
+
+### Desktop
+
+#### Features
+
+- **i18n:** add Brazilian Portuguese (pt-BR) translation (#3209)
+- **preview:** native Streamdown markdown rendering + full theming (#3204)
+
+#### Bug Fixes
+
+- **conversation:** align workspace path availability handling (#3207)
+- **preview:** dedupe @codemirror/language so markdown source highlight survives (#3206)
+
+### Core ([v0.1.22](https://github.com/iOfficeAI/AionCore/releases/tag/v0.1.22))
+
+#### Bug Fixes
+
+- **acp:** stabilize mode and model source of truth ([#409](https://github.com/iOfficeAI/AionCore/issues/409))
+- **conversation:** align workspace path availability handling ([#410](https://github.com/iOfficeAI/AionCore/issues/410))
+- **file:** lazy load browse roots ([#406](https://github.com/iOfficeAI/AionCore/issues/406))
+- prepare managed acp tools locally without cdn ([#408](https://github.com/iOfficeAI/AionCore/issues/408))
+
+#### Refactoring
+
+- **error:** finish ApiError phase3 ([#398](https://github.com/iOfficeAI/AionCore/issues/398))
+
+---
+
+## [2.1.11](https://github.com/iOfficeAI/AionUi/compare/v2.1.10...v2.1.11) (2026-06-04)
+
+### Desktop
+
+#### Features
+
+- **preview:** unify code viewing & editing on CodeMirror 6 (#3194)
+- **preview:** unify code view font and fix view-mode/line-height regressions (#3185)
+- **workspace:** VSCode-style file tree icons + smoother preview browsing (#3181)
+- add managed acp artifact mirror workflow (#3182)
+
+#### Bug Fixes
+
+- **web-host:** use aioncore reported backend port (#3193)
+- **settings:** apply UI scale only on slider release (#3190)
+
+### Core ([v0.1.20](https://github.com/iOfficeAI/AionCore/releases/tag/v0.1.20))
+
+#### Bug Fixes
+
+- **app:** bind backend before startup services ([#397](https://github.com/iOfficeAI/AionCore/issues/397))
+- stabilize agent runtime terminal lifecycle ([#396](https://github.com/iOfficeAI/AionCore/pull/396))
+
+#### Refactoring
+
+- **error:** ACP error classification ([#393](https://github.com/iOfficeAI/AionCore/issues/393))
+- **error:** migrate phase2 service errors ([#395](https://github.com/iOfficeAI/AionCore/issues/395))
+
+---
+
 ## [2.1.10](https://github.com/iOfficeAI/AionUi/compare/v2.1.9...v2.1.10) (2026-06-02)
 
 ### Desktop
