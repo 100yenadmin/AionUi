@@ -61,8 +61,7 @@ export const EVAOS_NATIVE_COMPANION_BOUNDARY_VERSION = '2026-06-06.rc-parity';
 export const EVAOS_NATIVE_COMPANION_CANARIES = [
   {
     id: 'pre-canary-bridge-peekaboo',
-    command:
-      'PYTHONPATH=src python3 -m evaos_desktop_bridge.pre_canary --json --control-surface bridge-peekaboo',
+    command: 'PYTHONPATH=src python3 -m evaos_desktop_bridge.pre_canary --json --control-surface bridge-peekaboo',
     requiredArtifact: 'qa-report.json',
     forbidsSkips: true,
   },

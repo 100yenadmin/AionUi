@@ -240,7 +240,9 @@ describe('EvaosCustomerContext', () => {
   });
 
   it('brokered customer context refreshes targets when the broker session identity changes', async () => {
-    brokerMocks.getSessionStatus.mockResolvedValueOnce(brokerSession()).mockResolvedValueOnce(brokerSession('member@example.test'));
+    brokerMocks.getSessionStatus
+      .mockResolvedValueOnce(brokerSession())
+      .mockResolvedValueOnce(brokerSession('member@example.test'));
     brokerMocks.getCustomerTargets
       .mockResolvedValueOnce(customerTargets())
       .mockResolvedValueOnce(memberCustomerTargets());

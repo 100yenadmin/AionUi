@@ -65,7 +65,12 @@ export function useEvaosSidebarState(): EvaosSidebarState {
 
   const canSeeBrokeredRoute = useMemo(() => {
     return (routePath: string): boolean => {
-      if (status !== 'authenticated' || brokerSessionStatus.loading || !brokerAuthenticated || !customerContext.loaded) {
+      if (
+        status !== 'authenticated' ||
+        brokerSessionStatus.loading ||
+        !brokerAuthenticated ||
+        !customerContext.loaded
+      ) {
         return false;
       }
       return evaosRuntimeRouteDecision(routePath, routeContext).allowed;

@@ -38,7 +38,9 @@ describe('NativeCompanionPage', () => {
     expect(container.textContent).toContain('Status source: native-companion:ready');
     expect(container.textContent).toContain('Renderer receives callback secrets: false');
     expect(container.textContent).toContain('broker session handoff');
-    expect(container.textContent).toContain('exact RC candidate passes native adapter, release, rollback, and support gates');
+    expect(container.textContent).toContain(
+      'exact RC candidate passes native adapter, release, rollback, and support gates'
+    );
     expect(container.textContent).toContain('pre-canary-bridge-peekaboo');
     expect(container.textContent).toContain('connector-kill-switch');
     expect(container.textContent).toContain('No skips');

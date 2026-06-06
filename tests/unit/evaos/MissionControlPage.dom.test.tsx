@@ -136,15 +136,16 @@ describe('MissionControlPage', () => {
 
     const { container } = render(<MissionControlPage />);
 
-    expect(await screen.findByText('Public beta gated')).toBeInTheDocument();
-    expect(screen.getByText('Local shell smoke')).toBeInTheDocument();
-    expect(screen.getByText('Live staging canaries')).toBeInTheDocument();
-    expect(screen.getByText('Signed macOS artifact')).toBeInTheDocument();
-    expect(screen.getByText('Role and org denial proof')).toBeInTheDocument();
-    expect(screen.getByText('Rollback and support path')).toBeInTheDocument();
-    expect(container.textContent).toContain('Continue R&D with blockers');
+    expect(await screen.findByText('RC parity gated')).toBeInTheDocument();
+    expect(screen.getByText('Parity audit active')).toBeInTheDocument();
+    expect(screen.getByText('RC parity proof')).toBeInTheDocument();
+    expect(screen.getByText('Native adapter canaries')).toBeInTheDocument();
+    expect(screen.getByText('Upstream regression')).toBeInTheDocument();
+    expect(screen.getByText('Visible branding')).toBeInTheDocument();
+    expect(screen.getByText('Exact RC canary')).toBeInTheDocument();
+    expect(container.textContent).toContain('user-testing distribution stays blocked');
     expect(container.textContent).toContain(
-      'Start evaOS Workbench Beta locally and screenshot the beta routes before new feature slices.'
+      'Start evaOS Workbench Beta locally for RC proof'
     );
     expect(container.textContent).not.toContain('Stack approval');
     expect(container.textContent).not.toContain('Root PR #15');

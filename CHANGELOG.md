@@ -4,7 +4,7 @@
 
 ### Native Companion Boundary
 
-- evaOS Workbench Beta is a shell/workflow compositor. Mac pairing, TCC/local control, secure callbacks, signed helpers, local credential custody, and local machine audit authority remain in the evaOS native companion and broker-backed Workbench fallback.
+- evaOS Workbench Beta is a shell/workflow compositor. Mac pairing, TCC/local control, secure callbacks, signed helpers, local credential custody, and local machine audit authority remain in the evaOS native companion and broker-backed Workbench fallback until exact-candidate native canaries pass.
 - Beta builds block legacy shell-launch, Office preview watch, and local filesystem mutation/upload/watch actions by default unless an explicit diagnostic override is set.
 
 ### Public Beta Packaging

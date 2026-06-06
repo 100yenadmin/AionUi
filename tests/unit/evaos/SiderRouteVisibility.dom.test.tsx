@@ -179,7 +179,12 @@ describe('Sider runtime route visibility', () => {
 
   it('shows product routes only when the broker policy grants the matching scopes', () => {
     customerContextMock.roles = ['member'];
-    customerContextMock.scopes = ['manage_members', 'manage_integrations', 'view_company_brain', 'open_business_browser'];
+    customerContextMock.scopes = [
+      'manage_members',
+      'manage_integrations',
+      'view_company_brain',
+      'open_business_browser',
+    ];
     brokerSessionMock.session = {
       ...brokerSessionMock.session,
       userEmail: 'member@example.test',
