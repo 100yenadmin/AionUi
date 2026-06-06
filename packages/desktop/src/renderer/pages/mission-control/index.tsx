@@ -86,7 +86,7 @@ const RUNTIME_TARGETS: RuntimeTarget[] = [
 const PUBLIC_BETA_GATE_ITEMS: BetaGateItem[] = [
   {
     label: 'RC parity proof',
-    detail: 'Prove every evaOS Workbench feature against the exact AionUi candidate.',
+    detail: 'Prove every evaOS Workbench feature against the exact evaOS Workbench Beta candidate.',
   },
   {
     label: 'Native adapter canaries',
@@ -94,7 +94,7 @@ const PUBLIC_BETA_GATE_ITEMS: BetaGateItem[] = [
   },
   {
     label: 'Upstream regression',
-    detail: 'AionUi v2.1.12 runtime, preview, ACP, workspace, and realtime fixes must be reconciled.',
+    detail: 'Upstream shell v2.1.12 runtime, preview, ACP, workspace, and realtime fixes must be reconciled.',
   },
   {
     label: 'Visible branding',
