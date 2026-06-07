@@ -18,17 +18,24 @@ import { AgentHubModal } from './AgentHubModal';
 import InlineAgentEditor, { type CustomAgentDraft } from './InlineAgentEditor';
 import { getAgentKey } from '@/renderer/pages/guid/hooks/agentSelectionUtils';
 import { sortEvaosDetectedAgentsForPresentation } from '@/renderer/evaos/evaosAgentPresentation';
-import { getEvaosNativeAgentAvailability } from '@/renderer/evaos/evaosNativeAgentAvailability';
+import {
+  applyEvaosNativeCompanionStatusToAgent,
+  getEvaosNativeAgentAvailability,
+} from '@/renderer/evaos/evaosNativeAgentAvailability';
+import { useEvaosNativeCompanionStatus } from '@/renderer/evaos/useEvaosNativeCompanionStatus';
 
 const LocalAgents: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [hubModalVisible, setHubModalVisible] = useState(false);
+  const { status: nativeCompanionStatus } = useEvaosNativeCompanionStatus();
 
   // Single fetch for all agents; both detected and custom lists are derived from it.
   const { agents: allAgents, revalidate: mutateAgents } = useAgents();
 
-  const detectedAgents = allAgents.filter((a) => a.agent_type !== 'remote' && a.agent_source !== 'custom');
+  const detectedAgents = allAgents
+    .filter((a) => a.agent_type !== 'remote' && a.agent_source !== 'custom')
+    .map((agent) => applyEvaosNativeCompanionStatusToAgent(agent, nativeCompanionStatus));
 
   const customAgents: AgentMetadata[] = allAgents.filter((a) => a.agent_source === 'custom');
 

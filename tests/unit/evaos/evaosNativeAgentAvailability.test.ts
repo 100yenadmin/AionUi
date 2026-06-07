@@ -6,6 +6,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  applyEvaosNativeCompanionStatusToAgent,
   getEvaosNativeAgentAvailability,
   isEvaosNativeAgentRepairRequired,
   isEvaosNativeDependentAgent,
@@ -99,5 +100,38 @@ describe('evaosNativeAgentAvailability', () => {
 
     expect(source).toBe(detectedHermes);
     expect(getEvaosNativeAgentAvailability(source!).status).toBe('usable');
+  });
+
+  it('applies read-only native companion readiness to evaOS and Hermes rows', () => {
+    const nativeStatus = {
+      schemaVersion: 'evaos.native_companion_status.v1' as const,
+      generatedAt: '2026-06-07T03:45:00.000Z',
+      readiness: 'ready' as const,
+      summaryText: 'Native bridge ready.',
+      sourcePointer: 'native-companion:read-only-bridge',
+      canOpenReleasedWorkbench: true,
+      releasedWorkbench: { installed: true, path: '/Applications/evaOS.app' },
+      bridgeCli: { installed: true, status: 'ready' as const, readOnly: true, auditId: 'audit-bridge' },
+      customerMac: { status: 'ready' as const, auditId: 'audit-mac' },
+      iPhone: { status: 'available' as const, auditId: 'audit-iphone' },
+      audit: { status: 'ready' as const, auditIds: ['audit-mac'] },
+    };
+
+    const evaos = applyEvaosNativeCompanionStatusToAgent(
+      { agent_type: 'openclaw-gateway', backend: 'openclaw-gateway', name: 'OpenClaw' },
+      nativeStatus
+    );
+    const hermes = applyEvaosNativeCompanionStatusToAgent(
+      { agent_type: 'acp', backend: 'hermes', name: 'Hermes' },
+      nativeStatus
+    );
+    const claude = applyEvaosNativeCompanionStatusToAgent(
+      { agent_type: 'acp', backend: 'claude', name: 'Claude Code' },
+      nativeStatus
+    );
+
+    expect(getEvaosNativeAgentAvailability(evaos).status).toBe('usable');
+    expect(getEvaosNativeAgentAvailability(hermes).status).toBe('usable');
+    expect(claude).not.toHaveProperty('native_companion_status');
   });
 });

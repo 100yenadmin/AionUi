@@ -5,6 +5,7 @@
  */
 
 import { getEvaosAgentDisplayName } from './evaosAgentPresentation';
+import type { IEvaosNativeCompanionStatusView } from '@/common/evaos/bridgeTypes';
 
 type EvaosNativeAgentIdentity = {
   agent_type?: string;
@@ -85,6 +86,30 @@ function readNativeStatus(agent: EvaosNativeAgentIdentity): string | undefined {
 
 export function isEvaosNativeDependentAgent(agent: EvaosNativeAgentIdentity): boolean {
   return NATIVE_DEPENDENT_AGENT_KEYS.has(nativeAgentKey(agent));
+}
+
+export function applyEvaosNativeCompanionStatusToAgent<T extends EvaosNativeAgentIdentity>(
+  agent: T,
+  nativeStatus: IEvaosNativeCompanionStatusView | null | undefined
+): T {
+  if (!nativeStatus || !isEvaosNativeDependentAgent(agent)) {
+    return agent;
+  }
+
+  const status = nativeStatus.readiness === 'ready' ? 'ready' : 'repair_required';
+  const handshake = agent.handshake && typeof agent.handshake === 'object' ? agent.handshake : {};
+  return {
+    ...agent,
+    native_companion_status: status,
+    handshake: {
+      ...(handshake as Record<string, unknown>),
+      native_companion: {
+        status,
+        source: nativeStatus.sourcePointer,
+        audit_id: nativeStatus.audit.latestAuditId,
+      },
+    },
+  };
 }
 
 export function resolveEvaosNativeAvailabilitySource(

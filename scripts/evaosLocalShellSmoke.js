@@ -113,6 +113,7 @@ const ROUTE_CHECKS = [
       'evaos-workbench-beta',
       'Boundary clean',
     ],
+    settledAnyMarkers: ['Native companion ready', 'Native companion repair required'],
     loadedStateRequiredMarkers: [
       'native companion status matrix',
       'open-native handoff',
@@ -132,7 +133,7 @@ const ROUTE_CHECKS = [
       'Open native companion',
       'RC native canary contract',
       'Status source: native-companion:ready',
-      'AionUi shell is local trust authority: false',
+      'Shell is local trust authority: false',
       'Renderer receives native secrets: false',
       'Deep-link scheme: evaos-workbench-beta',
       'evaos-workbench-beta',
@@ -782,6 +783,7 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
       'evaos-workbench-beta',
       'Boundary clean',
     ],
+    settledAnyMarkers: ['Native companion ready', 'Native companion repair required'],
     loadedStateRequiredMarkers: [
       'native companion status matrix',
       'open-native handoff',
@@ -802,7 +804,7 @@ const LOCAL_PRODUCT_ROUTE_CHECKS = [
       'Open native companion',
       'Handoff target: evaos-workbench-beta://native-companion/status',
       'Status source: native-companion:ready',
-      'AionUi shell is local trust authority: false',
+      'Shell is local trust authority: false',
       'Renderer receives native secrets: false',
       'Deep-link scheme: evaos-workbench-beta',
       'Renderer receives callback secrets: false',
@@ -1271,6 +1273,18 @@ async function waitForSettledMarkers(page, markers) {
   await page.waitForTimeout(250);
 }
 
+async function waitForAnySettledMarker(page, markers = []) {
+  if (!markers.length) {
+    return;
+  }
+  await page.waitForFunction(
+    (expectedMarkers) => expectedMarkers.some((marker) => document.body.innerText.includes(marker)),
+    markers,
+    { timeout: 20000 }
+  );
+  await page.waitForTimeout(250);
+}
+
 async function routeScreenshot(page, screenshotsDir, routeName) {
   const screenshotPath = path.join(screenshotsDir, `${routeName}.png`);
   await page.screenshot({ path: screenshotPath, fullPage: true });
@@ -1434,6 +1448,7 @@ async function runLocalShellSmoke(options = {}) {
         );
       }
       await waitForSettledMarkers(page, check.settledMarkers);
+      await waitForAnySettledMarker(page, check.settledAnyMarkers);
       const text = await page.locator('body').innerText({ timeout: 10000 });
       findings.push(...textFindings(check.name, text, check.expected, check.forbidden));
       findings.push(...(await selectorFindings(page, check.name, check.requiredSelectors)));
@@ -1445,6 +1460,7 @@ async function runLocalShellSmoke(options = {}) {
         textLength: text.trim().length,
         proofStage: check.proofStage,
         settledMarkers: check.settledMarkers,
+        settledAnyMarkers: check.settledAnyMarkers ?? [],
         loadedStateRequiredMarkers: check.loadedStateRequiredMarkers,
         requiredSelectors: check.requiredSelectors ?? [],
       });

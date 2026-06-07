@@ -22,6 +22,8 @@ import {
   getEvaosAgentDisplayName,
   sortEvaosDetectedAgentsForPresentation,
 } from '@/renderer/evaos/evaosAgentPresentation';
+import { applyEvaosNativeCompanionStatusToAgent } from '@/renderer/evaos/evaosNativeAgentAvailability';
+import { useEvaosNativeCompanionStatus } from '@/renderer/evaos/useEvaosNativeCompanionStatus';
 import { getAgentModes } from '@/renderer/utils/model/agentModes';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import useSWR from 'swr';
@@ -144,6 +146,7 @@ export const useGuidAgentSelection = ({
   // Guard: only run the initial restore once; user selections are never overwritten
   const initialRestoreDoneRef = useRef(false);
   const [selectedAcpModel, _setSelectedAcpModel] = useState<string | null>(null);
+  const { status: nativeCompanionStatus } = useEvaosNativeCompanionStatus();
 
   // Wrap setSelectedAgentKey to also save to storage
   const setSelectedAgentKey = useCallback((key: string) => {
@@ -280,9 +283,9 @@ export const useGuidAgentSelection = ({
     // instead of mistaking it for a logo URL.
     const normalisedDetected: AvailableAgent[] = sortEvaosDetectedAgentsForPresentation(availableAgentsData).map(
       (a) => {
-        const asAgent = a as AgentMetadata;
+        const asAgent = applyEvaosNativeCompanionStatusToAgent(a as AgentMetadata, nativeCompanionStatus);
         const isCustomRow = asAgent.agent_source === 'custom';
-        return Object.assign({}, a, {
+        return Object.assign({}, asAgent, {
           name: getEvaosAgentDisplayName(asAgent),
           id: asAgent.id,
           custom_agent_id: isCustomRow ? asAgent.id : (a as AvailableAgent).custom_agent_id,
@@ -298,7 +301,7 @@ export const useGuidAgentSelection = ({
       avatar: ra.avatar,
     }));
     setAvailableAgents([...normalisedDetected, ...remoteAsAvailable]);
-  }, [availableAgentsData, remoteAgentsData]);
+  }, [availableAgentsData, remoteAgentsData, nativeCompanionStatus]);
 
   // Track whether the resetAssistant flag has been consumed so it only fires once
   // per navigation. Use locationKey (changes on every navigate()) to reset the guard,

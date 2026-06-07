@@ -6,7 +6,7 @@
 
 import React from 'react';
 import classNames from 'classnames';
-import { Tag } from '@arco-design/web-react';
+import { Button, Tag } from '@arco-design/web-react';
 import { Computer, Link, Shield } from '@icon-park/react';
 import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { EVAOS_BETA_IDENTITY } from '@/common/evaos/betaIdentity';
@@ -19,11 +19,28 @@ import {
   type EvaosNativeCompanionStatusScenario,
   type EvaosNativeCompanionStatusSeverity,
 } from '@/common/evaos/nativeCompanionBoundary';
+import { useEvaosNativeCompanionStatus } from '@/renderer/evaos/useEvaosNativeCompanionStatus';
+import type { IEvaosNativeCompanionPermissionView, IEvaosNativeCompanionStatusView } from '@/common/evaos/bridgeTypes';
 
 const NativeCompanionPage: React.FC = () => {
   const layout = useLayoutContext();
   const isMobile = layout?.isMobile ?? false;
   const violations = getEvaosNativeCompanionBoundaryViolations();
+  const { status, loading, error, refresh, openReleasedWorkbench } = useEvaosNativeCompanionStatus();
+  const [handoffMessage, setHandoffMessage] = React.useState<string | null>(null);
+  const liveStatusTitle =
+    status?.readiness === 'ready'
+      ? 'Native companion ready'
+      : loading
+        ? 'Checking native companion'
+        : 'Native companion repair required';
+  const liveStatusTagColor = status?.readiness === 'ready' ? 'green' : loading ? 'gray' : 'orange';
+  const liveSummary = status?.summaryText || error || 'Checking released Workbench and read-only bridge status.';
+
+  const handleOpenReleasedWorkbench = React.useCallback(async () => {
+    const result = await openReleasedWorkbench();
+    setHandoffMessage(result.message);
+  }, [openReleasedWorkbench]);
 
   return (
     <div
@@ -47,11 +64,61 @@ const NativeCompanionPage: React.FC = () => {
         </header>
 
         <section className='grid grid-cols-1 gap-10px md:grid-cols-5'>
-          <StatusTile label='Install' value='Not installed' />
-          <StatusTile label='Pairing' value='Not paired' />
-          <StatusTile label='Permissions' value='Permission needed' />
-          <StatusTile label='iPhone' value='Unavailable' />
+          <StatusTile
+            label='Install'
+            value={status ? (status.releasedWorkbench.installed ? 'Installed' : 'Not installed') : 'Checking'}
+          />
+          <StatusTile
+            label='Pairing'
+            value={status ? (status.readiness === 'ready' ? 'Ready' : 'Repair required') : 'Checking'}
+          />
+          <StatusTile
+            label='Permissions'
+            value={permissionSummary(status?.bridgeCli.permissions, status?.customerMac.permissions)}
+          />
+          <StatusTile label='iPhone' value={iPhoneSummary(status)} />
           <StatusTile label='Trust authority' value='Native companion' />
+        </section>
+
+        <section className='rounded-8px border border-solid border-[var(--color-border-2)] bg-fill-1 p-16px'>
+          <div className='flex flex-wrap items-start justify-between gap-12px'>
+            <div className='min-w-0'>
+              <h2 className='m-0 text-18px font-semibold leading-24px text-t-primary'>{liveStatusTitle}</h2>
+              <p className='m-0 mt-6px text-13px leading-20px text-t-secondary'>{liveSummary}</p>
+              {handoffMessage && <p className='m-0 mt-6px text-12px leading-18px text-t-secondary'>{handoffMessage}</p>}
+            </div>
+            <div className='flex flex-wrap items-center gap-8px'>
+              <Tag color={liveStatusTagColor}>{status?.readiness ?? (loading ? 'checking' : 'unavailable')}</Tag>
+              <Button size='small' loading={loading} onClick={() => void refresh()}>
+                Refresh
+              </Button>
+              <Button
+                size='small'
+                type='primary'
+                disabled={!status?.canOpenReleasedWorkbench}
+                onClick={() => void handleOpenReleasedWorkbench()}
+              >
+                Open released Workbench
+              </Button>
+            </div>
+          </div>
+          <div className='mt-14px grid grid-cols-1 gap-8px text-12px leading-18px text-t-secondary md:grid-cols-2'>
+            <EvidenceRow label='Bridge CLI' value={status?.bridgeCli.status ?? 'checking'} />
+            <EvidenceRow label='Bridge audit' value={status?.bridgeCli.auditId ?? 'none'} />
+            <EvidenceRow label='Customer Mac' value={status?.customerMac.status ?? 'checking'} />
+            <EvidenceRow label='Device label' value={status?.customerMac.deviceLabel ?? 'none'} />
+            <EvidenceRow label='Screen sharing' value={status?.customerMac.screenSharing ?? 'unknown'} />
+            <EvidenceRow label='iPhone Mirroring' value={status ? iPhoneSummary(status) : 'checking'} />
+            <EvidenceRow label='Audit IDs' value={status?.audit.auditIds.join(', ') || 'none'} />
+            <EvidenceRow label='Source' value={status?.sourcePointer ?? 'native-companion:checking'} />
+            <EvidenceRow
+              label='Released Workbench'
+              value={
+                status?.releasedWorkbench.installed ? status.releasedWorkbench.path || 'installed' : 'not installed'
+              }
+            />
+            <EvidenceRow label='Renderer owns trust authority' value='false' />
+          </div>
         </section>
 
         <section className='rounded-8px border border-solid border-[var(--color-border-2)] bg-fill-1 p-16px'>
@@ -61,11 +128,13 @@ const NativeCompanionPage: React.FC = () => {
                 Native companion status matrix
               </h2>
               <p className='m-0 mt-6px text-13px leading-20px text-t-secondary'>
-                Status-only proof for install, pairing, permission, ready, and unavailable states. AionUi may show the
-                handoff target, but native trust remains outside the shell.
+                Status-only proof for install, pairing, permission, ready, and unavailable states. This shell may show
+                the handoff target, but native trust remains outside the shell.
               </p>
             </div>
-            <Tag color='gray'>Status source required</Tag>
+            <Tag color={status?.readiness === 'ready' ? 'green' : 'gray'}>
+              {status?.readiness === 'ready' ? 'Status loaded' : 'Status source required'}
+            </Tag>
           </div>
 
           <div className='mt-14px grid grid-cols-1 gap-10px lg:grid-cols-2'>
@@ -95,7 +164,7 @@ const NativeCompanionPage: React.FC = () => {
             <EvidenceRow label='Boundary version' value={EVAOS_NATIVE_COMPANION_BOUNDARY.version} />
             <EvidenceRow label='Shell role' value={EVAOS_NATIVE_COMPANION_BOUNDARY.shell.role} />
             <EvidenceRow
-              label='AionUi shell is local trust authority'
+              label='Shell is local trust authority'
               value={String(EVAOS_NATIVE_COMPANION_BOUNDARY.shell.isLocalTrustAuthority)}
             />
             <EvidenceRow
@@ -258,6 +327,31 @@ function statusSeverityColor(severity: EvaosNativeCompanionStatusSeverity): stri
     return 'orange';
   }
   return 'red';
+}
+
+function permissionSummary(
+  bridgePermissions: IEvaosNativeCompanionPermissionView | undefined,
+  customerMacPermissions: IEvaosNativeCompanionPermissionView | undefined
+): string {
+  const accessibility = bridgePermissions?.accessibility || customerMacPermissions?.accessibility;
+  const screenRecording = bridgePermissions?.screenRecording || customerMacPermissions?.screenRecording;
+  if (accessibility === 'granted' && screenRecording === 'granted') {
+    return 'Granted';
+  }
+  if (!accessibility && !screenRecording) {
+    return 'Checking';
+  }
+  return 'Repair required';
+}
+
+function iPhoneSummary(status: IEvaosNativeCompanionStatusView | null | undefined): string {
+  if (!status) {
+    return 'Checking';
+  }
+  if (!status.iPhone.installed) {
+    return 'Unavailable';
+  }
+  return status.iPhone.running ? 'Running' : 'Installed';
 }
 
 export default NativeCompanionPage;
