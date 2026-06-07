@@ -31,6 +31,7 @@ const localShellSmoke = require('../../../scripts/evaosLocalShellSmoke.js') as {
     forbidden: string[];
     proofStage: string;
     settledMarkers: string[];
+    settledAnyMarkers?: string[];
     loadedStateRequiredMarkers: string[];
     action?: string;
     isolateRendererState?: boolean;
@@ -560,6 +561,7 @@ describe('evaOS local shell smoke', () => {
     expect(agentSettings?.forbidden).toEqual(
       expect.arrayContaining(['Remote Agents', 'Allow insecure', 'Handshake', 'Connect remote'])
     );
+    expect(agentSettings?.settledAnyMarkers).toEqual(['Paired']);
     expect(localShellSmoke.TEAM_ROUTE_CHECK.forbidden).toEqual(
       expect.arrayContaining(['Team Space', 'Create team', 'team mode'])
     );

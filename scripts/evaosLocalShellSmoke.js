@@ -72,6 +72,7 @@ const ROUTE_CHECKS = [
     title: 'Agent',
     proofStage: PROOF_STAGES.SHELL_SMOKE,
     settledMarkers: ['Local Agents', 'Custom uses your configured model providers', 'Detect Custom Agent'],
+    settledAnyMarkers: ['Paired'],
     loadedStateRequiredMarkers: ['local agent inventory result', 'remote guardrail copy'],
     expected: ['Local Agents', 'Custom uses your configured model providers', 'Detect Custom Agent'],
     forbidden: ['Root PR #15', 'Stack approval', 'Remote Agents', 'Allow insecure', 'Handshake', 'Connect remote'],
