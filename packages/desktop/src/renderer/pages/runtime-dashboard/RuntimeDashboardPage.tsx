@@ -258,7 +258,8 @@ const RuntimeDashboardPage: React.FC<RuntimeDashboardPageProps> = ({ runtimeKey,
       (brokeredLaunchContractAvailable && settledState === 'live'));
   const canOpenRuntime =
     actionsAllowedByState &&
-    (hasRuntimeAction(statusView, ['open_dashboard', 'open']) || (brokeredLaunchContractAvailable && !canAttachRuntime));
+    (hasRuntimeAction(statusView, ['open_dashboard', 'open']) ||
+      (brokeredLaunchContractAvailable && !canAttachRuntime));
   const attachAvailable = actionsAllowedByState && (hasSafeAttachAction(statusView) || brokeredLaunchContractAvailable);
 
   return (
