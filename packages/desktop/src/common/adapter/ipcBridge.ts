@@ -239,6 +239,8 @@ import type {
   IEvaosApprovalCenterView,
   IEvaosApprovalDenyRequest,
   IEvaosApprovalDecisionResult,
+  IEvaosNativeCompanionStatusView,
+  IEvaosNativeCompanionOpenResult,
 } from '../evaos/bridgeTypes';
 export type {
   IEvaosRuntimeKey,
@@ -299,6 +301,8 @@ export type {
   IEvaosApprovalCenterView,
   IEvaosApprovalDenyRequest,
   IEvaosApprovalDecisionResult,
+  IEvaosNativeCompanionStatusView,
+  IEvaosNativeCompanionOpenResult,
 } from '../evaos/bridgeTypes';
 
 // ---------------------------------------------------------------------------
@@ -1448,6 +1452,15 @@ export const evaosCompanyBrain = {
   >('evaos.company-brain.account-360'),
   query: buildEvaosProvider<IBridgeResponse<IEvaosCompanyBrainQueryResult>, IEvaosCompanyBrainQueryRequest>(
     'evaos.company-brain.query'
+  ),
+};
+
+export const evaosNativeCompanion = {
+  getStatus: buildEvaosProvider<IBridgeResponse<IEvaosNativeCompanionStatusView>, void>(
+    'evaos.native-companion.status'
+  ),
+  openReleasedWorkbench: buildEvaosProvider<IBridgeResponse<IEvaosNativeCompanionOpenResult>, void>(
+    'evaos.native-companion.open-released-workbench'
   ),
 };
 

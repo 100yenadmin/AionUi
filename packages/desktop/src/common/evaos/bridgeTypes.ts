@@ -92,6 +92,72 @@ export interface IEvaosRuntimeStatusView {
   auditId?: string;
 }
 
+export type IEvaosNativeCompanionReadiness = 'ready' | 'repair_required' | 'unavailable';
+export type IEvaosNativeCompanionStatusValue =
+  | 'ready'
+  | 'available'
+  | 'repair_required'
+  | 'missing'
+  | 'unavailable'
+  | 'error';
+
+export interface IEvaosNativeCompanionPermissionView {
+  accessibility?: string;
+  screenRecording?: string;
+}
+
+export interface IEvaosNativeCompanionStatusView {
+  schemaVersion: 'evaos.native_companion_status.v1';
+  generatedAt: string;
+  readiness: IEvaosNativeCompanionReadiness;
+  summaryText: string;
+  sourcePointer: string;
+  canOpenReleasedWorkbench: boolean;
+  releasedWorkbench: {
+    installed: boolean;
+    running?: boolean;
+    path?: string;
+    bundleId?: string;
+    version?: string;
+    displayName?: string;
+  };
+  bridgeCli: {
+    installed: boolean;
+    status: IEvaosNativeCompanionStatusValue;
+    path?: string;
+    auditId?: string;
+    permissions?: IEvaosNativeCompanionPermissionView;
+    readOnly: boolean;
+  };
+  customerMac: {
+    status: IEvaosNativeCompanionStatusValue;
+    auditId?: string;
+    deviceLabel?: string;
+    permissions?: IEvaosNativeCompanionPermissionView;
+    screenSharing?: string;
+    killSwitchAvailable?: boolean;
+    appendOnlyAuditLog?: boolean;
+  };
+  iPhone: {
+    status: IEvaosNativeCompanionStatusValue;
+    auditId?: string;
+    installed?: boolean;
+    running?: boolean;
+    killSwitchAvailable?: boolean;
+  };
+  audit: {
+    status: IEvaosNativeCompanionStatusValue;
+    auditIds: string[];
+    latestAuditId?: string;
+  };
+}
+
+export interface IEvaosNativeCompanionOpenResult {
+  opened: boolean;
+  message: string;
+  path?: string;
+}
+
 export interface IEvaosBusinessBrowserRequest {
   customerId: string;
 }

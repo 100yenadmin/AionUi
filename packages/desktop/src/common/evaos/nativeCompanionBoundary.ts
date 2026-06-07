@@ -141,7 +141,7 @@ export const EVAOS_NATIVE_COMPANION_STATUS_MATRIX = [
     label: 'Permission needed',
     severity: 'warning',
     summary:
-      'Accessibility or Screen Recording permission is missing. AionUi can show this status but cannot grant it.',
+      'Accessibility or Screen Recording permission is missing. This shell can show this status but cannot grant it.',
     statusSource: 'native-companion:tcc-required',
     evidence: ['Accessibility not ready', 'Screen Recording not ready', 'Permission audit missing'],
     handoff: {
@@ -155,7 +155,8 @@ export const EVAOS_NATIVE_COMPANION_STATUS_MATRIX = [
     key: 'ready',
     label: 'Ready',
     severity: 'ready',
-    summary: 'Native companion reports Mac connector readiness. AionUi may display proof and request brokered actions.',
+    summary:
+      'Native companion reports Mac connector readiness. This shell may display proof and request brokered actions.',
     statusSource: 'native-companion:ready',
     evidence: ['Native companion id present', 'Helper identity verified', 'Append-only audit source present'],
     handoff: {
@@ -293,7 +294,7 @@ export function canEvaosShellPerformLocalTrustAction(actionId: string): EvaosLoc
   if ((EVAOS_FORBIDDEN_LOCAL_TRUST_ACTIONS as readonly string[]).includes(actionId)) {
     return {
       allowed: false,
-      reason: `${actionId} is native-companion owned; AionUi may only request or render broker/native proof.`,
+      reason: `${actionId} is native-companion owned; this shell may only request or render broker/native proof.`,
     };
   }
 
@@ -307,7 +308,7 @@ export function getEvaosNativeCompanionBoundaryViolations(): string[] {
   const violations: string[] = [];
 
   if (EVAOS_NATIVE_COMPANION_BOUNDARY.shell.isLocalTrustAuthority) {
-    violations.push('AionUi shell is marked as local trust authority.');
+    violations.push('This shell is marked as local trust authority.');
   }
 
   if (EVAOS_NATIVE_COMPANION_BOUNDARY.shell.rendererReceivesNativeSecrets) {
