@@ -95,13 +95,17 @@ function assertExpectedBundle(bundleInfo) {
   }
 }
 
+function normalizeWaitSelector(selector) {
+  return String(selector).replace(/^body:text\((.*)\)$/, 'body:has-text($1)');
+}
+
 function buildInstalledProofPlan(plan = SETTLED_SHELL_SCREENSHOT_PLAN, options = {}) {
   const expectedShortHead = shortHead(options.expectedHead);
 
   return plan.map((entry) => {
-    const waitSelectors = [...entry.waitSelectors];
+    const waitSelectors = entry.waitSelectors.map(normalizeWaitSelector);
     if (entry.id === 'settings-about' && expectedShortHead) {
-      const commitSelector = `body:text("${expectedShortHead}")`;
+      const commitSelector = normalizeWaitSelector(`body:text("${expectedShortHead}")`);
       if (!waitSelectors.includes(commitSelector)) {
         waitSelectors.push(commitSelector);
       }

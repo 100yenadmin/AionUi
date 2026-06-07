@@ -128,11 +128,28 @@ describe('evaOS installed app product proof', () => {
     );
 
     expect(proofPlan.find((entry) => entry.id === 'settings-about')?.waitSelectors).toContain(
-      'body:text("2fb812c12ddf")'
+      'body:has-text("2fb812c12ddf")'
     );
     expect(proofPlan.find((entry) => entry.id === 'mission-control')?.waitSelectors).not.toContain(
-      'body:text("2fb812c12ddf")'
+      'body:has-text("2fb812c12ddf")'
     );
+  });
+
+  it('normalizes body text waits to the installed Playwright selector syntax', () => {
+    const proofPlan = installedAppProof.buildInstalledProofPlan([
+      {
+        id: 'home',
+        route: '/home',
+        screenshot: '00-home.png',
+        waitSelectors: ['body:text("evaOS Workbench Beta")', 'body:has-text("Home")', '[data-testid="ready"]'],
+      },
+    ]);
+
+    expect(proofPlan[0].waitSelectors).toEqual([
+      'body:has-text("evaOS Workbench Beta")',
+      'body:has-text("Home")',
+      '[data-testid="ready"]',
+    ]);
   });
 
   it('preserves route settle actions so hidden diagnostics can be opened before proof waits', () => {
@@ -250,7 +267,7 @@ describe('evaOS installed app product proof', () => {
           id: 'settings-about',
           route: '/settings/about',
           screenshot: '05-settings-about.png',
-          waitSelectors: ['body:text("Build identity")', 'body:text("2fb812c12ddf")'],
+          waitSelectors: ['body:has-text("Build identity")', 'body:has-text("2fb812c12ddf")'],
         },
       ],
     });
