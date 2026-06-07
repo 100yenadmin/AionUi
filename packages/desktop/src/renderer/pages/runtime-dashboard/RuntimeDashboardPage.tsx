@@ -13,6 +13,13 @@ import { useLayoutContext } from '@renderer/hooks/context/LayoutContext';
 import { evaosBroker, type IEvaosRuntimeStatusView } from '@/common/adapter/ipcBridge';
 import type { IEvaosRuntimeActionResult, IEvaosRuntimeActionType, IEvaosRuntimeKey } from '@/common/evaos/bridgeTypes';
 
+const BROKERED_RUNTIME_ACTION_KEYS: ReadonlySet<IEvaosRuntimeKey> = new Set([
+  'openclaw',
+  'hermes',
+  'paperclip',
+  'terminal',
+]);
+
 const SECRET_TEXT_PATTERN =
   /\b(?:eds|epg)_[A-Za-z0-9_-]{4,}\b|access[_-]?token|refresh[_-]?token|desktop[_-]?session|provider[_-]?grant|grant[_-]?handle|authorization|bearer|secret|password/i;
 
@@ -69,6 +76,10 @@ function settledStateColor(state: 'live' | 'denied' | 'repair' | 'offline'): 'gr
   if (state === 'repair') return 'orange';
   if (state === 'denied') return 'red';
   return 'gray';
+}
+
+function hasBrokeredRuntimeLaunchContract(runtimeKey: IEvaosRuntimeKey): boolean {
+  return BROKERED_RUNTIME_ACTION_KEYS.has(runtimeKey);
 }
 
 function runtimeActionSummary(result: IEvaosRuntimeActionResult): string {
@@ -181,6 +192,13 @@ const RuntimeDashboardPage: React.FC<RuntimeDashboardPageProps> = ({ runtimeKey,
     }
   }, [customerContext.selectedCustomerId, isCurrentRequest, runtimeKey, title]);
 
+  useEffect(() => {
+    if (customerContext.loading || !customerContext.selectedCustomerId) {
+      return;
+    }
+    void loadRuntimeStatus();
+  }, [customerContext.loading, customerContext.selectedCustomerId, loadRuntimeStatus]);
+
   const runRuntimeAction = useCallback(
     async (action: IEvaosRuntimeActionType) => {
       const selectedCustomerId = selectedCustomerRef.current ?? customerContext.selectedCustomerId;
@@ -230,15 +248,18 @@ const RuntimeDashboardPage: React.FC<RuntimeDashboardPageProps> = ({ runtimeKey,
     customerContext.selectedTarget?.displayName ?? customerContext.selectedCustomerId ?? 'No customer selected';
   const statusText = safeUiText(statusView?.status, runtimeError ? 'blocked' : 'waiting');
   const healthText = runtimeError ?? safeUiText(statusView?.healthSummary, subtitle);
-  const attachAvailable = hasSafeAttachAction(statusView);
   const settledState = runtimeSettledState(statusView, runtimeError);
-  const canAttachRuntime = hasRuntimeAction(statusView, [
-    'attach_dashboard',
-    'start_attach',
-    'launch',
-    'runtime_launch',
-  ]);
-  const canOpenRuntime = hasRuntimeAction(statusView, ['open_dashboard', 'open']);
+  const actionsAllowedByState = settledState !== 'denied' && settledState !== 'offline';
+  const brokeredLaunchContractAvailable =
+    actionsAllowedByState && Boolean(statusView) && hasBrokeredRuntimeLaunchContract(runtimeKey);
+  const canAttachRuntime =
+    actionsAllowedByState &&
+    (hasRuntimeAction(statusView, ['attach_dashboard', 'start_attach', 'launch', 'runtime_launch']) ||
+      (brokeredLaunchContractAvailable && settledState === 'live'));
+  const canOpenRuntime =
+    actionsAllowedByState &&
+    (hasRuntimeAction(statusView, ['open_dashboard', 'open']) || (brokeredLaunchContractAvailable && !canAttachRuntime));
+  const attachAvailable = actionsAllowedByState && (hasSafeAttachAction(statusView) || brokeredLaunchContractAvailable);
 
   return (
     <div
