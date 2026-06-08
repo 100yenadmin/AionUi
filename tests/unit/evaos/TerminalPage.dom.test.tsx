@@ -15,6 +15,7 @@ const brokerMocks = vi.hoisted(() => ({
   getSessionStatus: vi.fn(),
   getCustomerTargets: vi.fn(),
   runtimeStatus: vi.fn(),
+  runtimeAction: vi.fn(),
 }));
 
 vi.mock('@renderer/hooks/context/LayoutContext', () => ({
@@ -31,6 +32,9 @@ vi.mock('@/common/adapter/ipcBridge', () => ({
     },
     runtimeStatus: {
       invoke: brokerMocks.runtimeStatus,
+    },
+    runtimeAction: {
+      invoke: brokerMocks.runtimeAction,
     },
   },
 }));
@@ -82,6 +86,7 @@ describe('TerminalPage', () => {
     });
     brokerMocks.getCustomerTargets.mockReset();
     brokerMocks.runtimeStatus.mockReset();
+    brokerMocks.runtimeAction.mockReset();
     brokerMocks.getCustomerTargets.mockResolvedValue(customerTargets());
   });
 
@@ -113,6 +118,61 @@ describe('TerminalPage', () => {
       expect(brokerMocks.runtimeStatus).toHaveBeenCalledWith({ customerId: 'david-poku', runtime: 'terminal' });
     });
     expect(container.textContent).not.toMatch(/eds_|epg_|access_token|desktop_session|provider_grant|Bearer/i);
+  });
+
+  it('mounts the brokered VM shell surface when Terminal attach returns an opaque surface handle', async () => {
+    brokerMocks.runtimeStatus.mockResolvedValue({
+      success: true,
+      data: {
+        schemaVersion: 'evaos.runtime_status.v1',
+        customerId: 'david-poku',
+        customerAccountId: 'acct_terminal',
+        runtimeKey: 'terminal',
+        displayLabel: 'Terminal',
+        status: 'running',
+        healthSummary: 'Terminal VM shell is ready.',
+        actions: ['attach_dashboard'],
+        sourcePointer: 'broker://runtime/terminal/audit_status',
+        auditId: 'audit_terminal_status',
+      },
+    });
+    brokerMocks.runtimeAction.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'attached',
+        runtimeKey: 'terminal',
+        customerId: 'david-poku',
+        message: 'Attached Terminal VM shell.',
+        runtimeSurface: {
+          schemaVersion: 'evaos.runtime_surface.v1',
+          surfaceId: 'surface-terminal-shell',
+          surfaceUri: 'evaos-runtime-surface://surface-terminal-shell/',
+          customerId: 'david-poku',
+          runtimeKey: 'terminal',
+          displayLabel: 'Terminal',
+          status: 'attached',
+          sourcePointer: 'broker://runtime/terminal/attach',
+          auditId: 'audit_terminal_attach',
+        },
+        backendEnforced: true,
+      },
+    });
+
+    const { container } = render(<TerminalPage />);
+
+    expect(await screen.findByText('Broker action available')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(brokerMocks.runtimeAction).toHaveBeenCalledWith({
+        customerId: 'david-poku',
+        runtime: 'terminal',
+        action: 'attach',
+      });
+    });
+    const surface = await screen.findByTestId('evaos-runtime-surface-terminal');
+    expect(surface).toHaveAttribute('src', 'evaos-runtime-surface://surface-terminal-shell/');
+    expect(surface).toHaveAttribute('partition', 'evaos-runtime-surface-terminal-shell');
+    expect(surface).not.toHaveAttribute('allowpopups', 'true');
+    expect(container.textContent).not.toMatch(/eds_|epg_|access_token|desktop_session|provider_grant|Bearer|launch_url/i);
   });
 
   it('clears stale terminal evidence when customer context changes', async () => {
