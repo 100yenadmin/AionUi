@@ -177,6 +177,17 @@ describe('BusinessBrowserPage', () => {
         status: 'opened',
         message: 'Browser launched.',
         browser: browserView({ currentUrlDisplay: 'chatgpt.com/codex' }),
+        runtimeSurface: {
+          schemaVersion: 'evaos.runtime_surface.v1',
+          surfaceId: 'surface-browser-launch',
+          surfaceUri: 'evaos-runtime-surface://surface-browser-launch/',
+          customerId: 'david-poku',
+          runtimeKey: 'browser',
+          displayLabel: 'Business Browser',
+          status: 'attached',
+          sourcePointer: 'broker:runtime_launch:browser',
+          auditId: 'audit_launch_123',
+        },
         urlSummary: {
           host: 'chatgpt.com',
           path: '/codex',
@@ -216,7 +227,6 @@ describe('BusinessBrowserPage', () => {
     const { container } = render(<BusinessBrowserPage />);
 
     expect(await screen.findByRole('button', { name: 'David Poku Co' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
 
     expect(await screen.findByText('app.example.test/dashboard')).toBeInTheDocument();
     expect(screen.getByText('Browser is ready')).toBeInTheDocument();
@@ -281,7 +291,6 @@ describe('BusinessBrowserPage', () => {
     const { container } = render(<BusinessBrowserPage />);
 
     expect(await screen.findByRole('button', { name: 'David Poku Co' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     await user.click(screen.getByRole('button', { name: /^launch$/i }));
 
     const surface = await screen.findByTestId('evaos-business-browser-surface');
@@ -290,6 +299,92 @@ describe('BusinessBrowserPage', () => {
     expect(surface).not.toHaveAttribute('allowpopups', 'true');
     expect(container.textContent).not.toMatch(/launch_url|desktop_session|eds_|Bearer|token=/i);
     expect(container.textContent).not.toContain('runtime.example.test');
+  });
+
+  it('auto-mounts the browser surface when broker status advertises browser_launch', async () => {
+    browserMocks.getStatus.mockResolvedValue({
+      success: true,
+      data: {
+        ...browserView({ currentUrlDisplay: 'customer.example.test/dashboard' }),
+        actions: ['browser_launch', 'browser_open_url', 'browser_stop'],
+      },
+    });
+    browserMocks.launch.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'attached',
+        message: 'Business Browser attached.',
+        browser: browserView({ currentUrlDisplay: 'customer.example.test/dashboard' }),
+        runtimeSurface: {
+          schemaVersion: 'evaos.runtime_surface.v1',
+          surfaceId: 'surface-browser-auto-attach',
+          surfaceUri: 'evaos-runtime-surface://surface-browser-auto-attach/',
+          customerId: 'david-poku',
+          runtimeKey: 'browser',
+          displayLabel: 'Business Browser',
+          status: 'attached',
+          sourcePointer: 'broker:runtime_launch:browser',
+          auditId: 'audit_browser_auto_attach',
+        },
+        auditId: 'audit_browser_auto_attach',
+        backendEnforced: true,
+      },
+    });
+
+    const { container } = render(<BusinessBrowserPage />);
+
+    expect(await screen.findByText('customer.example.test/dashboard')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(browserMocks.launch).toHaveBeenCalledWith({ customerId: 'david-poku' });
+    });
+    const surface = await screen.findByTestId('evaos-business-browser-surface');
+    expect(surface).toHaveAttribute('src', 'evaos-runtime-surface://surface-browser-auto-attach/');
+    expect(surface).toHaveAttribute('partition', 'evaos-runtime-surface-browser-auto-attach');
+    expect(surface).not.toHaveAttribute('allowpopups', 'true');
+    expect(container.textContent).not.toMatch(/launch_url|desktop_session|eds_|Bearer|token=/i);
+  });
+
+  it('auto-mounts the browser surface when broker status advertises browser_open_url for an active browser', async () => {
+    browserMocks.getStatus.mockResolvedValue({
+      success: true,
+      data: {
+        ...browserView({ currentUrlDisplay: 'running.example.test/dashboard' }),
+        actions: ['browser_open_url', 'browser_stop'],
+      },
+    });
+    browserMocks.launch.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'attached',
+        message: 'Business Browser attached.',
+        browser: browserView({ currentUrlDisplay: 'running.example.test/dashboard' }),
+        runtimeSurface: {
+          schemaVersion: 'evaos.runtime_surface.v1',
+          surfaceId: 'surface-browser-open-url',
+          surfaceUri: 'evaos-runtime-surface://surface-browser-open-url/',
+          customerId: 'david-poku',
+          runtimeKey: 'browser',
+          displayLabel: 'Business Browser',
+          status: 'attached',
+          sourcePointer: 'broker:runtime_launch:browser',
+          auditId: 'audit_browser_open_url_attach',
+        },
+        auditId: 'audit_browser_open_url_attach',
+        backendEnforced: true,
+      },
+    });
+
+    const { container } = render(<BusinessBrowserPage />);
+
+    expect(await screen.findByText('running.example.test/dashboard')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(browserMocks.launch).toHaveBeenCalledWith({ customerId: 'david-poku' });
+    });
+    const surface = await screen.findByTestId('evaos-business-browser-surface');
+    expect(surface).toHaveAttribute('src', 'evaos-runtime-surface://surface-browser-open-url/');
+    expect(surface).toHaveAttribute('partition', 'evaos-runtime-surface-browser-open-url');
+    expect(surface).not.toHaveAttribute('allowpopups', 'true');
+    expect(container.textContent).not.toMatch(/launch_url|desktop_session|eds_|Bearer|token=/i);
   });
 
   it('clears browser status when customer context changes before loading the next customer', async () => {
@@ -307,15 +402,12 @@ describe('BusinessBrowserPage', () => {
     render(<BusinessBrowserPage />);
 
     expect(await screen.findByRole('button', { name: 'David Poku Co' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('app.one.test/dashboard')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Second Customer' }));
 
     expect(screen.queryByText('app.one.test/dashboard')).not.toBeInTheDocument();
-    expect(screen.getByText('Load a customer account to view browser runtime evidence.')).toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('app.two.test/home')).toBeInTheDocument();
   });
 
@@ -399,7 +491,6 @@ describe('BusinessBrowserPage', () => {
     render(<BusinessBrowserPage />);
 
     expect(await screen.findByRole('button', { name: 'David Poku Co' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     await user.click(screen.getByRole('button', { name: 'Second Customer' }));
 
     await act(async () => {
@@ -411,7 +502,6 @@ describe('BusinessBrowserPage', () => {
 
     expect(screen.queryByText('app.one.test/dashboard')).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('app.two.test/home')).toBeInTheDocument();
   });
 
@@ -458,7 +548,6 @@ describe('BusinessBrowserPage', () => {
     render(<BusinessBrowserPage />);
 
     expect(await screen.findByRole('button', { name: 'David Poku Co' })).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /^load$/i }));
     expect(await screen.findByText('app.one.test/dashboard')).toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: /^load$/i }));
