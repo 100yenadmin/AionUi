@@ -39,6 +39,14 @@ type NavItem = { label: string; icon: React.ReactElement; path: string; id: stri
 
 type TranslateFn = (key: string, options?: { defaultValue?: string }) => string;
 
+/**
+ * Builds the built-in settings navigation items allowed for a platform and broker policy.
+ *
+ * @param isDesktop Whether the renderer is running inside the desktop shell.
+ * @param t Translation function used for settings labels.
+ * @param policy Broker policy used to filter tabs; null or undefined keeps standalone sessions permissive.
+ * @returns A new NavItem array; inputs are not mutated.
+ */
 export function getBuiltinSettingsNavItems(
   isDesktop: boolean,
   t: TranslateFn,

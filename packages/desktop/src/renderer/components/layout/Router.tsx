@@ -9,6 +9,7 @@ import {
   getWorkbenchRouteFallback,
   useWorkbenchPolicy,
 } from '@renderer/hooks/context/WorkbenchPolicyContext';
+import { isElectronDesktop } from '@renderer/utils/platform';
 import { TEAM_MODE_ENABLED } from '@/common/config/constants';
 const Conversation = React.lazy(() => import('@renderer/pages/conversation'));
 const Guid = React.lazy(() => import('@renderer/pages/guid'));
@@ -49,9 +50,12 @@ const ProtectedLayout: React.FC<{ layout: React.ReactElement }> = ({ layout }) =
 
 const GuardedRoute: React.FC<{ pathname: string; element: React.ReactElement }> = ({ pathname, element }) => {
   const { policy } = useWorkbenchPolicy();
+  const routeOptions = { isDesktop: isElectronDesktop() };
 
-  if (!canAccessWorkbenchRoute(pathname, policy)) {
-    return <Navigate to={getWorkbenchRouteFallback(pathname, BUILTIN_SETTINGS_TAB_IDS, policy)} replace />;
+  if (!canAccessWorkbenchRoute(pathname, policy, routeOptions)) {
+    return (
+      <Navigate to={getWorkbenchRouteFallback(pathname, BUILTIN_SETTINGS_TAB_IDS, policy, routeOptions)} replace />
+    );
   }
 
   return element;
@@ -59,14 +63,20 @@ const GuardedRoute: React.FC<{ pathname: string; element: React.ReactElement }> 
 
 const SettingsIndexRedirect: React.FC = () => {
   const { policy } = useWorkbenchPolicy();
-  return <Navigate to={getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy)} replace />;
+  return (
+    <Navigate
+      to={getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy, { isDesktop: isElectronDesktop() })}
+      replace
+    />
+  );
 };
 
 const LegacySettingsRedirect: React.FC<{ pathname: string; allowedTo: string }> = ({ pathname, allowedTo }) => {
   const { policy } = useWorkbenchPolicy();
-  const to = canAccessWorkbenchRoute(pathname, policy)
+  const routeOptions = { isDesktop: isElectronDesktop() };
+  const to = canAccessWorkbenchRoute(pathname, policy, routeOptions)
     ? allowedTo
-    : getWorkbenchRouteFallback(pathname, BUILTIN_SETTINGS_TAB_IDS, policy);
+    : getWorkbenchRouteFallback(pathname, BUILTIN_SETTINGS_TAB_IDS, policy, routeOptions);
 
   return <Navigate to={to} replace />;
 };

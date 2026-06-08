@@ -101,9 +101,13 @@ describe('WorkbenchPolicyContext access helpers', () => {
   });
 
   it('keeps desktop-only tabs hidden in browser mode even when policy allows them', () => {
-    const policy: WorkbenchBrokerPolicy = { role: 'owner', scopes: [] };
+    const policy: WorkbenchBrokerPolicy = { role: 'agent_only', scopes: ['use_creative_studio'] };
 
     expect(canAccessBuiltinSettingsTab('pet', policy, { isDesktop: false })).toBe(false);
     expect(canAccessBuiltinSettingsTab('pet', policy, { isDesktop: true })).toBe(true);
+    expect(canAccessWorkbenchRoute('/settings/pet', policy, { isDesktop: false })).toBe(false);
+    expect(canAccessWorkbenchRoute('/settings/pet', policy, { isDesktop: true })).toBe(true);
+    expect(getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy, { isDesktop: false })).toBe('/settings/about');
+    expect(getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy, { isDesktop: true })).toBe('/settings/pet');
   });
 });

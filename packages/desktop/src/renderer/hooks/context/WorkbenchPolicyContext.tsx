@@ -34,16 +34,20 @@ export type WorkbenchAccountScope =
   | 'access_technical_diagnostics'
   | string;
 
-export interface WorkbenchBrokerPolicy {
+export type WorkbenchBrokerPolicy = {
   role?: WorkbenchAccountRole | null;
   scopes?: readonly WorkbenchAccountScope[] | null;
   customerAccountId?: string | null;
   profileId?: string | null;
-}
+};
 
-export interface WorkbenchPolicyContextValue {
+export type WorkbenchPolicyContextValue = {
   policy: WorkbenchBrokerPolicy | null;
-}
+};
+
+export type WorkbenchPolicyOptions = {
+  isDesktop?: boolean;
+};
 
 const WorkbenchPolicyContext = createContext<WorkbenchPolicyContextValue>({ policy: null });
 
@@ -118,6 +122,13 @@ function scopesForPolicy(policy: WorkbenchBrokerPolicy): Set<string> {
   return new Set(scopes);
 }
 
+/**
+ * Checks whether a broker policy grants at least one required scope.
+ *
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @param requiredScopes Scope list where any one matching scope is sufficient.
+ * @returns True when the route/action is allowed; owner, '*' and 'all' override explicit scopes.
+ */
 export function hasWorkbenchScope(
   policy: WorkbenchBrokerPolicy | null | undefined,
   requiredScopes: readonly WorkbenchAccountScope[]
@@ -130,23 +141,45 @@ export function hasWorkbenchScope(
   return requiredScopes.some((scope) => scopes.has(scope));
 }
 
+/**
+ * Checks whether a built-in settings tab is visible for the current policy and platform.
+ *
+ * @param tabId Built-in settings tab id.
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @param options Platform flags; pet settings are desktop-only when isDesktop is false.
+ * @returns True when the tab can be shown or opened.
+ */
 export function canAccessBuiltinSettingsTab(
   tabId: string,
   policy: WorkbenchBrokerPolicy | null | undefined,
-  options: { isDesktop?: boolean } = {}
+  options: WorkbenchPolicyOptions = {}
 ): boolean {
   if (tabId === 'pet' && options.isDesktop === false) return false;
   return hasWorkbenchScope(policy, SETTINGS_TAB_ACCESS[tabId] ?? ['access_technical_diagnostics']);
 }
 
+/**
+ * Checks whether extension-provided settings tabs are available.
+ *
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @returns True when provider/admin or diagnostics scopes allow extension settings.
+ */
 export function canAccessExtensionSettings(policy: WorkbenchBrokerPolicy | null | undefined): boolean {
   return hasWorkbenchScope(policy, ['manage_integrations', 'access_technical_diagnostics']);
 }
 
+/**
+ * Returns the first policy-allowed settings route from the ordered built-in tab list.
+ *
+ * @param orderedTabIds Ordered built-in tab ids from the settings navigation.
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @param options Platform flags forwarded to built-in tab checks.
+ * @returns A settings route, preferring model when allowed and falling back to About.
+ */
 export function getDefaultSettingsPath(
   orderedTabIds: readonly string[],
   policy: WorkbenchBrokerPolicy | null | undefined,
-  options: { isDesktop?: boolean } = {}
+  options: WorkbenchPolicyOptions = {}
 ): string {
   if (orderedTabIds.includes('model') && canAccessBuiltinSettingsTab('model', policy, options)) {
     return '/settings/model';
@@ -156,7 +189,19 @@ export function getDefaultSettingsPath(
   return `/settings/${firstAllowed ?? 'about'}`;
 }
 
-export function canAccessWorkbenchRoute(pathname: string, policy: WorkbenchBrokerPolicy | null | undefined): boolean {
+/**
+ * Checks whether a route can be opened under the current broker policy.
+ *
+ * @param pathname Router pathname being evaluated.
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @param options Platform flags forwarded to settings tab checks.
+ * @returns True when direct navigation to the route is allowed.
+ */
+export function canAccessWorkbenchRoute(
+  pathname: string,
+  policy: WorkbenchBrokerPolicy | null | undefined,
+  options: WorkbenchPolicyOptions = {}
+): boolean {
   if (!policy) return true;
   if (pathname === '/login' || pathname === '/' || pathname === '') return true;
   if (pathname === '/guid' || pathname.startsWith('/conversation/')) return true;
@@ -168,22 +213,31 @@ export function canAccessWorkbenchRoute(pathname: string, policy: WorkbenchBroke
 
   if (pathname === '/settings' || pathname.startsWith('/settings?')) return true;
   if (pathname === '/settings/skills-hub' || pathname === '/settings/tools') {
-    return canAccessBuiltinSettingsTab('capabilities', policy);
+    return canAccessBuiltinSettingsTab('capabilities', policy, options);
   }
   if (pathname.startsWith('/settings/ext/')) return canAccessExtensionSettings(policy);
   if (pathname.startsWith('/settings/')) {
     const tabId = pathname.slice('/settings/'.length).split('/')[0];
-    return canAccessBuiltinSettingsTab(tabId, policy);
+    return canAccessBuiltinSettingsTab(tabId, policy, options);
   }
 
   return true;
 }
 
+/**
+ * Resolves a safe fallback route after a broker policy denies direct navigation.
+ *
+ * @param pathname Denied route pathname.
+ * @param orderedSettingsTabIds Ordered built-in tab ids used for settings fallbacks.
+ * @param policy Broker-provided account policy; null keeps standalone sessions permissive.
+ * @param options Platform flags forwarded to settings default resolution.
+ * @returns A settings fallback for denied settings routes, otherwise the workbench deny fallback.
+ */
 export function getWorkbenchRouteFallback(
   pathname: string,
   orderedSettingsTabIds: readonly string[],
   policy: WorkbenchBrokerPolicy | null | undefined,
-  options: { isDesktop?: boolean } = {}
+  options: WorkbenchPolicyOptions = {}
 ): string {
   if (pathname.startsWith('/settings/')) {
     return getDefaultSettingsPath(orderedSettingsTabIds, policy, options);
@@ -191,6 +245,12 @@ export function getWorkbenchRouteFallback(
   return WORKBENCH_ACCESS_DENY_FALLBACK;
 }
 
+/**
+ * Provides the broker policy used by route guards and navigation filters.
+ *
+ * @param props React children and optional policy; omitted policy is treated as no broker policy loaded.
+ * @returns A context provider with a stable policy value.
+ */
 export const WorkbenchPolicyProvider: React.FC<React.PropsWithChildren<{ policy?: WorkbenchBrokerPolicy | null }>> = ({
   children,
   policy = null,
@@ -199,6 +259,11 @@ export const WorkbenchPolicyProvider: React.FC<React.PropsWithChildren<{ policy?
   return <WorkbenchPolicyContext.Provider value={value}>{children}</WorkbenchPolicyContext.Provider>;
 };
 
+/**
+ * Reads the current workbench policy context.
+ *
+ * @returns The policy context value; policy is null before broker policy is available.
+ */
 export function useWorkbenchPolicy(): WorkbenchPolicyContextValue {
   return useContext(WorkbenchPolicyContext);
 }

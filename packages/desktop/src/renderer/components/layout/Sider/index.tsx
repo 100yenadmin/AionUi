@@ -20,6 +20,7 @@ import {
   getDefaultSettingsPath,
   useWorkbenchPolicy,
 } from '@renderer/hooks/context/WorkbenchPolicyContext';
+import { isElectronDesktop } from '@renderer/utils/platform';
 
 const WorkspaceGroupedHistory = React.lazy(() => import('@renderer/pages/conversation/GroupedHistory'));
 const SettingsSider = React.lazy(() => import('@renderer/pages/settings/components/SettingsSider'));
@@ -47,8 +48,9 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
   const lastNonSettingsPathRef = useRef('/guid');
   const showLogout =
     typeof window !== 'undefined' && !(window as { electronAPI?: unknown }).electronAPI && status === 'authenticated';
-  const canAccessScheduled = canAccessWorkbenchRoute('/scheduled', policy);
-  const canAccessTeam = canAccessWorkbenchRoute('/team/:id', policy);
+  const routeOptions = { isDesktop: isElectronDesktop() };
+  const canAccessScheduled = canAccessWorkbenchRoute('/scheduled', policy, routeOptions);
+  const canAccessTeam = canAccessWorkbenchRoute('/team/:id', policy, routeOptions);
 
   useEffect(() => {
     if (!pathname.startsWith('/settings')) {
@@ -78,9 +80,11 @@ const Sider: React.FC<SiderProps> = ({ onSessionClick, collapsed = false }) => {
         console.error('Navigation failed:', error);
       });
     } else {
-      Promise.resolve(navigate(getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy))).catch((error) => {
-        console.error('Navigation failed:', error);
-      });
+      Promise.resolve(navigate(getDefaultSettingsPath(BUILTIN_SETTINGS_TAB_IDS, policy, routeOptions))).catch(
+        (error) => {
+          console.error('Navigation failed:', error);
+        }
+      );
     }
     if (onSessionClick) {
       onSessionClick();
