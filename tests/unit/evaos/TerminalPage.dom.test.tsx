@@ -172,7 +172,9 @@ describe('TerminalPage', () => {
     expect(surface).toHaveAttribute('src', 'evaos-runtime-surface://surface-terminal-shell/');
     expect(surface).toHaveAttribute('partition', 'evaos-runtime-surface-terminal-shell');
     expect(surface).not.toHaveAttribute('allowpopups', 'true');
-    expect(container.textContent).not.toMatch(/eds_|epg_|access_token|desktop_session|provider_grant|Bearer|launch_url/i);
+    expect(container.textContent).not.toMatch(
+      /eds_|epg_|access_token|desktop_session|provider_grant|Bearer|launch_url/i
+    );
   });
 
   it('shows the precise broker blocker when Terminal attach omits the VM shell surface', async () => {

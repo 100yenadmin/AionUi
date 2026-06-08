@@ -74,7 +74,9 @@ function runtimeSurfacePartition(surface: IEvaosRuntimeSurfaceView): string {
 }
 
 function hasBrowserAutoAttachAction(view: IEvaosBusinessBrowserView): boolean {
-  return view.actions.some((action) => action === 'start_attach' || action === 'browser_launch');
+  return view.actions.some(
+    (action) => action === 'start_attach' || action === 'browser_launch' || action === 'browser_open_url'
+  );
 }
 
 const BusinessBrowserPage: React.FC = () => {
@@ -350,14 +352,7 @@ const BusinessBrowserPage: React.FC = () => {
     }
     autoLaunchKeyRef.current = autoLaunchKey;
     void runBrowserAction('launch');
-  }, [
-    actionError,
-    actionTarget,
-    browserView,
-    customerContext.selectedCustomerId,
-    runBrowserAction,
-    runtimeSurface,
-  ]);
+  }, [actionError, actionTarget, browserView, customerContext.selectedCustomerId, runBrowserAction, runtimeSurface]);
 
   return (
     <div

@@ -344,6 +344,49 @@ describe('BusinessBrowserPage', () => {
     expect(container.textContent).not.toMatch(/launch_url|desktop_session|eds_|Bearer|token=/i);
   });
 
+  it('auto-mounts the browser surface when broker status advertises browser_open_url for an active browser', async () => {
+    browserMocks.getStatus.mockResolvedValue({
+      success: true,
+      data: {
+        ...browserView({ currentUrlDisplay: 'running.example.test/dashboard' }),
+        actions: ['browser_open_url', 'browser_stop'],
+      },
+    });
+    browserMocks.launch.mockResolvedValue({
+      success: true,
+      data: {
+        status: 'attached',
+        message: 'Business Browser attached.',
+        browser: browserView({ currentUrlDisplay: 'running.example.test/dashboard' }),
+        runtimeSurface: {
+          schemaVersion: 'evaos.runtime_surface.v1',
+          surfaceId: 'surface-browser-open-url',
+          surfaceUri: 'evaos-runtime-surface://surface-browser-open-url/',
+          customerId: 'david-poku',
+          runtimeKey: 'browser',
+          displayLabel: 'Business Browser',
+          status: 'attached',
+          sourcePointer: 'broker:runtime_launch:browser',
+          auditId: 'audit_browser_open_url_attach',
+        },
+        auditId: 'audit_browser_open_url_attach',
+        backendEnforced: true,
+      },
+    });
+
+    const { container } = render(<BusinessBrowserPage />);
+
+    expect(await screen.findByText('running.example.test/dashboard')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(browserMocks.launch).toHaveBeenCalledWith({ customerId: 'david-poku' });
+    });
+    const surface = await screen.findByTestId('evaos-business-browser-surface');
+    expect(surface).toHaveAttribute('src', 'evaos-runtime-surface://surface-browser-open-url/');
+    expect(surface).toHaveAttribute('partition', 'evaos-runtime-surface-browser-open-url');
+    expect(surface).not.toHaveAttribute('allowpopups', 'true');
+    expect(container.textContent).not.toMatch(/launch_url|desktop_session|eds_|Bearer|token=/i);
+  });
+
   it('clears browser status when customer context changes before loading the next customer', async () => {
     const user = userEvent.setup();
     browserMocks.getStatus
