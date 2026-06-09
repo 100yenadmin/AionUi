@@ -18,9 +18,11 @@ describe('EvaosSupportBubble', () => {
   afterEach(() => {
     cleanup();
     vi.clearAllMocks();
+    window.location.hash = '';
   });
 
   it('opens first-party evaOS feedback without secret-bearing metadata', async () => {
+    window.location.hash = '#/terminal';
     const user = userEvent.setup();
     render(<EvaosSupportBubble />);
 
@@ -30,16 +32,40 @@ describe('EvaosSupportBubble', () => {
 
     await user.click(button);
 
-    expect(feedbackMocks.openFeedback).toHaveBeenCalledWith({
-      module: 'other',
-      autoScreenshot: true,
-      tags: {
-        support_surface: 'evaos_beta_bubble',
-      },
-      extra: {
-        route: expect.any(String),
-        product: 'evaOS Workbench Beta',
-      },
-    });
+    expect(feedbackMocks.openFeedback).toHaveBeenCalledWith(
+      expect.objectContaining({
+        module: 'other',
+        autoScreenshot: true,
+        tags: expect.objectContaining({
+          evaos_product: 'workbench_beta',
+          evaos_route: '/terminal',
+          evaos_state: 'support_requested',
+          support_surface: 'evaos_beta_bubble',
+        }),
+        extra: expect.objectContaining({
+          app_version: expect.any(String),
+          audit_ids: [],
+          bundle_id: 'com.evaos.workbench.beta',
+          customer: expect.objectContaining({
+            roles: [],
+            scopes: [],
+            summary: 'Use the route-level report action when customer or broker audit context is visible.',
+          }),
+          product: 'evaOS Workbench Beta',
+          protocol_scheme: 'evaos-workbench-beta',
+          route: '/terminal',
+          screenshot: {
+            auto_capture_requested: true,
+            user_can_attach_more: true,
+          },
+          settled_state: 'support_requested',
+          support_packet_version: 'evaos.support_report.v1',
+          surface: 'evaos_beta_bubble',
+        }),
+      })
+    );
+    expect(JSON.stringify(feedbackMocks.openFeedback.mock.calls[0][0])).not.toMatch(
+      /desktop_session|eds_|Bearer|token=/i
+    );
   });
 });
