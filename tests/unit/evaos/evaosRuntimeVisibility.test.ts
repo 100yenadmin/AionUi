@@ -159,20 +159,9 @@ describe('evaosRuntimeVisibility', () => {
       '/company-brain',
     ]);
 
-    expect(evaosRouteAllowsMissingBroker('/home')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/evaos')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/openclaw')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/hermes')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/mission-control')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/native-companion')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/design-workspace')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/terminal')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/people-access')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/connected-apps')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/approval-center')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/business-browser')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/creative-studio')).toBe(true);
-    expect(evaosRouteAllowsMissingBroker('/company-brain')).toBe(true);
+    expect(
+      EVAOS_ROUTE_POLICIES.filter((policy) => policy.allowMissingBroker).map((policy) => policy.routePath)
+    ).toEqual(['/home', '/native-companion']);
   });
 
   it('lets signed-in admins reach evaOS and Hermes routes while preserving broker repair states', () => {
@@ -243,5 +232,34 @@ describe('evaosRuntimeVisibility', () => {
         scopes: [],
       })
     ).toEqual({ allowed: false, fallbackPath: '/guid', reason: 'scope_required' });
+  });
+
+  it('lets authenticated employees reach Mac & iPhone repair without opening admin/runtime surfaces', () => {
+    const employeeContext = {
+      authenticated: true,
+      roles: ['member'],
+      scopes: [] as const,
+      userEmail: 'employee@example.test',
+    };
+
+    expect(evaosRuntimeRouteDecision('/native-companion', employeeContext)).toEqual({
+      allowed: true,
+      fallbackPath: '/guid',
+    });
+    expect(evaosRuntimeRouteDecision('/evaos', employeeContext)).toEqual({
+      allowed: false,
+      fallbackPath: '/guid',
+      reason: 'admin_runtime_required',
+    });
+    expect(evaosRuntimeRouteDecision('/hermes', employeeContext)).toEqual({
+      allowed: false,
+      fallbackPath: '/guid',
+      reason: 'admin_runtime_required',
+    });
+    expect(evaosRuntimeRouteDecision('/terminal', employeeContext)).toEqual({
+      allowed: false,
+      fallbackPath: '/guid',
+      reason: 'admin_runtime_required',
+    });
   });
 });

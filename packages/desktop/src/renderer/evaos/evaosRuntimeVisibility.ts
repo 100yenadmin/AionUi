@@ -154,75 +154,61 @@ export const EVAOS_ROUTE_POLICIES: EvaosRoutePolicy[] = [
     routePath: '/evaos',
     requiresAdmin: true,
     requiredScopes: ['access_openclaw_dashboard'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/openclaw',
     requiresAdmin: true,
     requiredScopes: ['access_openclaw_dashboard'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/hermes',
     requiresAdmin: true,
     requiredScopes: ['access_hermes_dashboard'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/mission-control',
     requiresAdmin: true,
-    allowMissingBroker: true,
   },
   {
     routePath: '/design-workspace',
     anyRequiredScopes: ['use_design_workspace'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/beta-readiness',
     requiresAdmin: true,
-    allowMissingBroker: true,
   },
   {
     routePath: '/terminal',
     requiresAdmin: true,
     requiredScopes: ['access_terminal'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/native-companion',
-    requiresAdmin: true,
     allowMissingBroker: true,
   },
   {
     routePath: '/people-access',
     anyRequiredScopes: ['manage_members'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/connected-apps',
     anyRequiredScopes: ['manage_integrations'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/approval-center',
     anyRequiredScopes: ['approve_actions'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/business-browser',
     anyRequiredScopes: ['open_business_browser'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/creative-studio',
     anyRequiredScopes: ['use_creative_studio'],
-    allowMissingBroker: true,
   },
   {
     routePath: '/company-brain',
     anyRequiredScopes: ['view_company_brain', 'manage_company_brain'],
-    allowMissingBroker: true,
   },
 ];
 

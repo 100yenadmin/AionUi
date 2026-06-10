@@ -69,6 +69,22 @@ function renderGuardedRoute(routePath = '/mission-control') {
     <MemoryRouter initialEntries={[routePath]}>
       <Routes>
         <Route
+          path='/evaos'
+          element={
+            <EvaosRuntimeRouteGuard routePath='/evaos'>
+              <p>evaOS loaded</p>
+            </EvaosRuntimeRouteGuard>
+          }
+        />
+        <Route
+          path='/hermes'
+          element={
+            <EvaosRuntimeRouteGuard routePath='/hermes'>
+              <p>Hermes loaded</p>
+            </EvaosRuntimeRouteGuard>
+          }
+        />
+        <Route
           path='/mission-control'
           element={
             <EvaosRuntimeRouteGuard routePath='/mission-control'>
@@ -193,13 +209,14 @@ describe('EvaosRuntimeRouteGuard', () => {
     });
   });
 
-  it('lets Mission Control render while customer context is still loading', () => {
+  it('holds broker-policy product routes behind a loader while customer context is still loading', () => {
     customerContextMock.loaded = false;
     customerContextMock.loading = true;
 
     renderGuardedRoute();
 
-    expect(screen.getByText('Mission Control loaded')).toBeInTheDocument();
+    expect(screen.queryByText('Mission Control loaded')).not.toBeInTheDocument();
+    expect(document.querySelector('.arco-spin')).toBeInTheDocument();
   });
 
   it('fails closed to the assistant route for member sessions that deep-link into admin runtimes', async () => {
@@ -282,7 +299,7 @@ describe('EvaosRuntimeRouteGuard', () => {
     expect(screen.getByText('Terminal loaded')).toBeInTheDocument();
   });
 
-  it('renders Terminal as a settled product route when the broker session is missing', () => {
+  it('denies Terminal when the broker session is missing', async () => {
     brokerSessionMock.session = {
       state: 'missing',
       authenticated: false,
@@ -293,11 +310,11 @@ describe('EvaosRuntimeRouteGuard', () => {
 
     renderGuardedRoute('/terminal');
 
-    expect(screen.getByText('Terminal loaded')).toBeInTheDocument();
-    expect(screen.queryByText('Guid fallback')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
+    expect(screen.queryByText('Terminal loaded')).not.toBeInTheDocument();
   });
 
-  it('renders broker-backed product pages as settled empty states when the broker session is missing', () => {
+  it('denies broker-backed product pages when the broker session is missing', async () => {
     brokerSessionMock.session = {
       state: 'missing',
       authenticated: false,
@@ -308,8 +325,8 @@ describe('EvaosRuntimeRouteGuard', () => {
 
     renderGuardedRoute('/approval-center');
 
-    expect(screen.getByText('Approval Center loaded')).toBeInTheDocument();
-    expect(screen.queryByText('Guid fallback')).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
+    expect(screen.queryByText('Approval Center loaded')).not.toBeInTheDocument();
   });
 
   it('allows native companion setup when the broker session is missing', () => {
@@ -324,6 +341,25 @@ describe('EvaosRuntimeRouteGuard', () => {
     renderGuardedRoute('/native-companion');
 
     expect(screen.getByText('Native companion loaded')).toBeInTheDocument();
+  });
+
+  it('allows native companion repair but denies direct evaOS and Hermes for employees', async () => {
+    customerContextMock.roles = ['member'];
+    customerContextMock.scopes = [];
+    brokerSessionMock.session = {
+      ...brokerSessionMock.session,
+      userEmail: 'employee@example.test',
+    };
+
+    const { unmount } = renderGuardedRoute('/native-companion');
+
+    expect(screen.getByText('Native companion loaded')).toBeInTheDocument();
+
+    unmount();
+    renderGuardedRoute('/evaos');
+
+    await waitFor(() => expect(screen.getByText('Guid fallback')).toBeInTheDocument());
+    expect(screen.queryByText('evaOS loaded')).not.toBeInTheDocument();
   });
 
   it('allows People Access only with the account policy scope or admin override', async () => {

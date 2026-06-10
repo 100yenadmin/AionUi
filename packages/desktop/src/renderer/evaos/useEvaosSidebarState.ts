@@ -80,20 +80,20 @@ export function useEvaosSidebarState(): EvaosSidebarState {
   const canSeeRepairableRoute = useMemo(() => {
     return (routePath: string): boolean => {
       if (!shellAuthenticated || brokerSessionStatus.loading) return false;
-      if (!brokerAuthenticated) return true;
+      if (!brokerAuthenticated) return evaosRouteAllowsMissingBroker(routePath);
       return customerContext.loaded && evaosRuntimeRouteDecision(routePath, routeContext).allowed;
     };
   }, [brokerAuthenticated, brokerSessionStatus.loading, customerContext.loaded, routeContext, shellAuthenticated]);
 
   const canSeeMissionControl = useMemo(() => {
     if (!shellAuthenticated || brokerSessionStatus.loading) return false;
-    if (!brokerAuthenticated) return true;
+    if (!brokerAuthenticated) return evaosRouteAllowsMissingBroker('/mission-control');
     return customerContext.loaded && evaosRuntimeRouteDecision('/mission-control', routeContext).allowed;
   }, [brokerAuthenticated, brokerSessionStatus.loading, customerContext.loaded, routeContext, shellAuthenticated]);
 
   const canSeeNativeCompanion = useMemo(() => {
     if (!shellAuthenticated || brokerSessionStatus.loading) return false;
-    if (!brokerAuthenticated) return true;
+    if (!brokerAuthenticated) return evaosRouteAllowsMissingBroker('/native-companion');
     return customerContext.loaded && evaosRuntimeRouteDecision('/native-companion', routeContext).allowed;
   }, [brokerAuthenticated, brokerSessionStatus.loading, customerContext.loaded, routeContext, shellAuthenticated]);
 
