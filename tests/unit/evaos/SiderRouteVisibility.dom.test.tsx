@@ -265,7 +265,7 @@ describe('Sider runtime route visibility', () => {
     expect(screen.queryByText('Connected Apps')).not.toBeInTheDocument();
     expect(screen.queryByText('Company Brain')).not.toBeInTheDocument();
     expect(screen.queryByText('Business Browser')).not.toBeInTheDocument();
-    expect(screen.queryByText('Mac & iPhone')).not.toBeInTheDocument();
+    expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
   });
 
   it('shows product routes only when the broker policy grants the matching scopes', () => {
@@ -295,7 +295,7 @@ describe('Sider runtime route visibility', () => {
     expect(screen.queryByText('Terminal')).not.toBeInTheDocument();
   });
 
-  it('keeps Workbench parity routes visible as repair surfaces when the web session exists but broker session is missing', () => {
+  it('keeps only setup routes visible when the web session exists but broker policy is missing', () => {
     brokerSessionMock.session = {
       state: 'missing',
       authenticated: false,
@@ -306,15 +306,16 @@ describe('Sider runtime route visibility', () => {
 
     renderSider();
 
-    expect(screen.getByText('Mission Control')).toBeInTheDocument();
+    expect(screen.getByText('Home')).toBeInTheDocument();
     expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
-    expect(screen.getByText('Design Workspace')).toBeInTheDocument();
-    expect(screen.getByText('Business Browser')).toBeInTheDocument();
-    expect(screen.getByText('Creative Studio')).toBeInTheDocument();
-    expect(screen.getByText('Connected Apps')).toBeInTheDocument();
-    expect(screen.getByText('People & Access')).toBeInTheDocument();
-    expect(screen.getByText('Company Brain')).toBeInTheDocument();
-    expect(screen.getByText('Terminal')).toBeInTheDocument();
+    expect(screen.queryByText('Mission Control')).not.toBeInTheDocument();
+    expect(screen.queryByText('Design Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Business Browser')).not.toBeInTheDocument();
+    expect(screen.queryByText('Creative Studio')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connected Apps')).not.toBeInTheDocument();
+    expect(screen.queryByText('People & Access')).not.toBeInTheDocument();
+    expect(screen.queryByText('Company Brain')).not.toBeInTheDocument();
+    expect(screen.queryByText('Terminal')).not.toBeInTheDocument();
   });
 
   it('keys route visibility to the current broker session identity', () => {
@@ -395,13 +396,14 @@ describe('Sider runtime route visibility', () => {
     expect(screen.getByText('admin@100yen.org')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Sign out' })).not.toBeInTheDocument();
     expect(screen.queryByText('Sign in to open Eva workspaces')).not.toBeInTheDocument();
-    expect(screen.getByText('Design Workspace')).toBeInTheDocument();
-    expect(screen.getByText('Business Browser')).toBeInTheDocument();
-    expect(screen.getByText('Creative Studio')).toBeInTheDocument();
-    expect(screen.getByText('Connected Apps')).toBeInTheDocument();
-    expect(screen.getByText('People & Access')).toBeInTheDocument();
-    expect(screen.getByText('Company Brain')).toBeInTheDocument();
-    expect(screen.getByText('Terminal')).toBeInTheDocument();
+    expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
+    expect(screen.queryByText('Design Workspace')).not.toBeInTheDocument();
+    expect(screen.queryByText('Business Browser')).not.toBeInTheDocument();
+    expect(screen.queryByText('Creative Studio')).not.toBeInTheDocument();
+    expect(screen.queryByText('Connected Apps')).not.toBeInTheDocument();
+    expect(screen.queryByText('People & Access')).not.toBeInTheDocument();
+    expect(screen.queryByText('Company Brain')).not.toBeInTheDocument();
+    expect(screen.queryByText('Terminal')).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Sign In' }));
 
@@ -539,6 +541,24 @@ describe('Sider runtime route visibility', () => {
     expect(screen.getByText('member@example.test')).toBeInTheDocument();
     expect(screen.getByText('Member Customer')).toBeInTheDocument();
     expect(screen.queryByLabelText('Selected customer')).not.toBeInTheDocument();
+  });
+
+  it('lets employees reach Mac & iPhone setup without exposing technical runtimes', () => {
+    customerContextMock.roles = ['member'];
+    customerContextMock.isOperator = false;
+    customerContextMock.scopes = [];
+    brokerSessionMock.session = {
+      ...brokerSessionMock.session,
+      userEmail: 'employee@example.test',
+    };
+
+    renderSider();
+
+    expect(screen.getByText('Mac & iPhone')).toBeInTheDocument();
+    expect(screen.queryByText('evaOS')).not.toBeInTheDocument();
+    expect(screen.queryByText('Hermes')).not.toBeInTheDocument();
+    expect(screen.queryByText('Mission Control')).not.toBeInTheDocument();
+    expect(screen.queryByText('Terminal')).not.toBeInTheDocument();
   });
 
   it('signs out by revoking the broker session before clearing the shell auth state', async () => {
