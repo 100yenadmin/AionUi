@@ -95,7 +95,7 @@ describe('resolveOfficeWatchUrl in Electron mode', () => {
 
 /**
  * Web (server) deployments must not point users at a desktop install link:
- * officecli has to be installed on the machine running AionUi, so the error
+ * officecli has to be installed on the machine running evaOS Workbench, so the error
  * panel shows a copyable server-side command instead (issue #3212 follow-up).
  */
 describe('resolveOfficeErrorActions', () => {
